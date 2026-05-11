@@ -53,7 +53,8 @@ public class Soldat extends Homme {
                 double projectileSpeed = 6.5;
                 double px = x + (dx / distance) * 18;
                 double py = y + (dy / distance) * 18;
-                ObjectManager.list.add(new Projectile(px, py, (dx / distance) * projectileSpeed, (dy / distance) * projectileSpeed));
+                // le this est passé pour que le projectile ignore les collisions avec le soldat qui l'a tiré
+                ObjectManager.list.add(new Projectile(px, py, (dx / distance) * projectileSpeed, (dy / distance) * projectileSpeed, this));
                 shootCooldown = 25;
             }
         }

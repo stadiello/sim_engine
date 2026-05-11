@@ -66,5 +66,6 @@ public class GamePanel extends JPanel implements Runnable {
         g.drawString("Civils: " + civils, 10, 20);
         g.drawString("Soldats: " + soldats, 10, 40);
         g.drawString("Aliens: " + aliens, 10, 60);
+        g.drawString("Casualties: " + (8 - civils - soldats), 10, 80);
     }
 }

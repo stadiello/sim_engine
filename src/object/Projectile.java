@@ -8,7 +8,7 @@ public class Projectile extends GameObject {
 
     private static Image imgShot;
 
-     static {
+    static {
         try {
             imgShot = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/shot_effect.png"));
         } catch (IOException e) {
@@ -18,11 +18,14 @@ public class Projectile extends GameObject {
 
     private double angle; // Angle de rotation du projectile
     private int vie = 120; // Durée de vie du projectile en frames
+    private final Homme tireur; // Le tireur à ignorer lors des collisions
 
-    public Projectile(double x, double y, double vx, double vy) {
+    // on utilise toujours homme car toutes les entité héritent de homme.
+    public Projectile(double x, double y, double vx, double vy, Homme tireur) {
         super(x, y);
         this.vx = vx;
         this.vy = vy;
+        this.tireur = tireur;
         this.angle = Math.atan2(vy, vx) + Math.PI / 2; // Calcul de l'angle de rotation pour orienter le projectile dans la direction du mouvement  
     }
 
@@ -30,8 +33,9 @@ public class Projectile extends GameObject {
         x += vx;
         y += vy;
 
+        // Vérification des collisions avec les hommes (ignorer le tireur lui-même)
         for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {
-            if (obj instanceof Homme homme) {
+            if (obj instanceof Homme homme && homme != tireur) {
                 double hx = homme.x - x;
                 double hy = homme.y - y;
                 if (hx * hx + hy * hy < 18 * 18) {
@@ -39,33 +43,7 @@ public class Projectile extends GameObject {
                     ObjectManager.list.remove(this);
                     return;
                 }
-            // if (obj instanceof Alien alien) {
-            //     double dx = alien.x - x;
-            //     double dy = alien.y - y;
-            //     if (dx * dx + dy * dy < 18 * 18) {
-            //         ObjectManager.list.remove(alien);
-            //         ObjectManager.list.remove(this);
-            //         return;
-            //     }
-            // }
-            // else if (obj instanceof Soldat soldat) {
-            //     double sx = soldat.x - x;
-            //     double sy = soldat.y - y;
-            //     if (sx * sx + sy * sy < 18 * 18) {
-            //         ObjectManager.list.remove(soldat);
-            //         ObjectManager.list.remove(this);
-            //         return;
-            //     }
-            // } 
-            // else if (obj instanceof Homme homme) {
-            //     double hx = homme.x - x;
-            //     double hy = homme.y - y;
-            //     if (hx * hx + hy * hy < 18 * 18) {
-            //         ObjectManager.list.remove(homme);
-            //         ObjectManager.list.remove(this);
-            //         return;
-            //     }
-            // }
+            }
         }
 
         vie--;
