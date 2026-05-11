@@ -9,6 +9,12 @@ public class Soldat extends Homme {
     private static Image imgCorps;
     private static Image arme;
 
+    private int shootCooldown = 0;
+    private int reloadTimer = 2;
+
+    private int timer = 0;
+
+
     static {
         try {
             imgCorps = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/corps.png"));
@@ -26,14 +32,57 @@ public class Soldat extends Homme {
 
     @Override
     public void update() {
-        super.update();
-        // Logique de combat ou de patrouille peut être ajoutée ici
+        Alien target = ObjectManager.getNearestAlien(x, y);
+
+        if (target != null) {
+            double dx = target.x - x;
+            double dy = target.y - y;
+            double distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 0) {
+                double speed = 2.4;
+                vx = (dx / distance) * speed;
+                vy = (dy / distance) * speed;
+            }
+
+            if (shootCooldown > 0) {
+                shootCooldown--;
+            }
+
+            if (distance > 0 && distance < 260 && shootCooldown == 0) {
+                double projectileSpeed = 6.5;
+                double px = x + (dx / distance) * 18;
+                double py = y + (dy / distance) * 18;
+                ObjectManager.list.add(new Projectile(px, py, (dx / distance) * projectileSpeed, (dy / distance) * projectileSpeed));
+                shootCooldown = 25;
+            }
+        }
+
+        x += vx;
+        y += vy;
+        timer++;
+
+        if (x < 0 || x > 800) vx = -vx;
+        if (y < 0 || y > 600) vy = -vy;
     }
 
+    // @Override
+    // public void draw(Graphics g) {
+    //     g.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 32, null);
+    //     g.drawImage(arme, (int)x + 5, (int)y - 28, 5, 30, null); // Arme dessinée à côté du corps
+    // }
     @Override
     public void draw(Graphics g) {
-        g.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 32, null);
-        g.drawImage(arme, (int)x + 5, (int)y - 28, 5, 30, null); // Arme dessinée à côté du corps
+        Graphics2D g2d = (Graphics2D) g;
+
+        double angle = Math.atan2(vy, vx) + Math.PI / 2; // Calcul de l'angle de rotation
+        int offsetArme = (int)(Math.sin(0.15) * 6);
+        var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
+
+        g2d.rotate(angle, x, y);
+        g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
+        g2d.drawImage(arme, (int)x + 5, (int)y - 23 + offsetArme, 5, 30, null); // Arme dessinée à côté du corps avec un léger mouvement
+        g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
+        
     }
-    
 }
