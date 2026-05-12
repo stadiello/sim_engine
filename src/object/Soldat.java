@@ -10,7 +10,6 @@ public class Soldat extends Homme {
     private static Image arme;
 
     private int shootCooldown = 0;
-    private int reloadTimer = 2;
 
     private int timer = 0;
 
@@ -59,12 +58,8 @@ public class Soldat extends Homme {
             }
         }
 
-        x += vx;
-        y += vy;
+        moveWithTileCollision(14);
         timer++;
-
-        if (x < 0 || x > 800) vx = -vx;
-        if (y < 0 || y > 600) vy = -vy;
     }
 
     // @Override
@@ -77,7 +72,7 @@ public class Soldat extends Homme {
         Graphics2D g2d = (Graphics2D) g;
 
         double angle = Math.atan2(vy, vx) + Math.PI / 2; // Calcul de l'angle de rotation
-        int offsetArme = (int)(Math.sin(0.15) * 6);
+        int offsetArme = (int)(Math.sin(timer * 0.15) * 6);
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
 
         g2d.rotate(angle, x, y);

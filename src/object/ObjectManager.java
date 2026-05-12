@@ -3,10 +3,21 @@ package object;
 import java.util.ArrayList;
 import java.awt.Graphics;
 
+import world.TileManager;
+
 public class ObjectManager {
 
     // une seule liste pour TOUTES les entités
     public static ArrayList<GameObject> list = new ArrayList<>();
+    private static TileManager tileManager;
+
+    public static void setTileManager(TileManager manager) {
+        tileManager = manager;
+    }
+
+    public static TileManager getTileManager() {
+        return tileManager;
+    }
 
     public static Alien getNearestAlien(double x, double y) {
         Alien nearest = null;

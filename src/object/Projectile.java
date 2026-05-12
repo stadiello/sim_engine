@@ -33,6 +33,11 @@ public class Projectile extends GameObject {
         x += vx;
         y += vy;
 
+        if (!canMoveTo(x, y, 2)) {
+            ObjectManager.list.remove(this);
+            return;
+        }
+
         // Vérification des collisions avec les hommes (ignorer le tireur lui-même)
         for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {
             if (obj instanceof Homme homme && homme != tireur) {

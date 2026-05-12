@@ -29,12 +29,8 @@ public class Homme extends GameObject {
     }
 
     public void update() {
-        x += vx;
-        y += vy;
+        moveWithTileCollision(14);
         timer++;
-
-        if (x < 0 || x > 800) vx = -vx;
-        if (y < 0 || y > 600) vy = -vy;
     }
     
     // public void draw(Graphics g) {
