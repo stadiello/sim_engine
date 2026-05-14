@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   sodipodi:docname="homme.svg"
+   inkscape:export-filename="../assets/aliens/dead_alien.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.023162177"
+     inkscape:cx="366.97759"
+     inkscape:cy="4403.7311"
+     inkscape:window-width="1512"
+     inkscape:window-height="771"
+     inkscape:window-x="0"
+     inkscape:window-y="33"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <rect
+       x="-6691.9444"
+       y="11484.24"
+       width="8289.3763"
+       height="5526.2508"
+       id="rect17" />
+    <rect
+       x="-5698.9462"
+       y="15369.885"
+       width="2158.6917"
+       height="2072.3441"
+       id="rect16" />
+    <rect
+       x="-2676.7777"
+       y="5569.4247"
+       width="2676.7777"
+       height="3712.9498"
+       id="rect15" />
+    <rect
+       x="-4231.0358"
+       y="6821.4659"
+       width="1252.0412"
+       height="1165.6935"
+       id="rect12" />
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter17"
+       x="-0.21786446"
+       y="-0.2251266"
+       width="1.4357289"
+       height="1.4502532">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur17" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter18"
+       x="-0.12743016"
+       y="-0.37521101"
+       width="1.2548603"
+       height="1.750422">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur18" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter19"
+       x="-1.1256331"
+       y="-0.20160591"
+       width="3.2512661"
+       height="1.4032118">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur19" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter20"
+       x="-1.1256331"
+       y="-0.20160591"
+       width="3.2512661"
+       height="1.4032118">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur20" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter21"
+       x="-1.1256331"
+       y="-0.20160591"
+       width="3.2512661"
+       height="1.4032118">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur21" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter22"
+       x="-1.1256331"
+       y="-0.20160591"
+       width="3.2512661"
+       height="1.4032118">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="64.235759"
+         id="feGaussianBlur22" />
+    </filter>
+  </defs>
+  <g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <circle
+       style="display:inline;opacity:1;fill:#0000ff;stroke:#000000;stroke-width:0.265;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1"
+       id="path1"
+       cx="102.80769"
+       cy="-868.15387"
+       r="308.42307"
+       inkscape:label="path1"
+       inkscape:export-filename="corps.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6"
+       cx="22.846155"
+       cy="-999.51923"
+       rx="57.115383"
+       ry="51.403847" />
+    <ellipse
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6-1"
+       cx="217.04956"
+       cy="-1005.1511"
+       rx="57.115383"
+       ry="51.403847" />
+    <rect
+       style="opacity:1;fill:#ffdd55;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14"
+       width="79.961533"
+       height="559.73077"
+       x="-239.88461"
+       y="-1370.7693"
+       inkscape:label="bras_gauche"
+       inkscape:export-filename="bras_g.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#ffd42a;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14-0"
+       width="79.961533"
+       height="559.73077"
+       x="371.28506"
+       y="-1364.9567"
+       inkscape:label="bras_droit"
+       inkscape:export-filename="bras_d.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="soldat">
+    <circle
+       style="display:inline;fill:#88aa00;fill-opacity:1;stroke:#000000;stroke-width:0.265;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-2"
+       cx="2773.0227"
+       cy="1513.4562"
+       r="308.42307"
+       inkscape:label="path1"
+       inkscape:export-filename="../assets/soldats/corps.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6-8"
+       cx="2693.061"
+       cy="1382.0908"
+       rx="57.115383"
+       ry="51.403847" />
+    <ellipse
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6-1-5"
+       cx="2887.2646"
+       cy="1376.459"
+       rx="57.115383"
+       ry="51.403847" />
+    <rect
+       style="fill:#ffdd55;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14-9"
+       width="79.961533"
+       height="559.73077"
+       x="2853.7476"
+       y="-837.70618"
+       inkscape:label="bras_gauche"
+       inkscape:export-filename="bras_g.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       transform="rotate(32.277425)" />
+    <rect
+       style="fill:#ffd42a;fill-opacity:1;stroke:#000000;stroke-width:0.196681;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14-0-4"
+       width="75.387589"
+       height="327.03754"
+       x="2815.3601"
+       y="607.75842"
+       inkscape:label="bras_droit"
+       inkscape:export-filename="bras_d.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       transform="matrix(0.98035031,0.19726445,0.31173824,0.95016802,0,0)"
+       inkscape:transform-center-x="-35.926773"
+       inkscape:transform-center-y="32.682249" />
+    <rect
+       style="fill:#b3b3b3;stroke:#000000;stroke-width:0.264999"
+       id="rect2"
+       width="102.80769"
+       height="708.23077"
+       x="2878.6155"
+       y="605.42303"
+       inkscape:label="arme"
+       inkscape:export-filename="soldats/armes.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="fill:#ff0000;stroke:#000000;stroke-width:0.264999"
+       id="path2"
+       cx="2935.7307"
+       cy="702.51923"
+       rx="45.69231"
+       ry="39.980766" />
+    <rect
+       style="fill:#ff0000;stroke:#000000;stroke-width:0.264999"
+       id="rect3"
+       width="34.26923"
+       height="708.23077"
+       x="2924.3079"
+       y="-1108.0385"
+       inkscape:export-filename="../assets/effets/shot_effect.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="fill:#00ff00;stroke:#000000;stroke-width:0.264999"
+       id="path4"
+       cx="-4146.5767"
+       cy="-319.84613"
+       rx="354.11539"
+       ry="342.69232"
+       inkscape:export-filename="aliens/alien.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="fill:#0000ff;stroke:#000000;stroke-width:0.264999"
+       id="path5"
+       cx="-4283.6538"
+       cy="-468.34619"
+       rx="102.80769"
+       ry="57.115383" />
+    <ellipse
+       style="fill:#0000ff;stroke:#000000;stroke-width:0.264999"
+       id="path5-7"
+       cx="-4009.3738"
+       cy="-468.25964"
+       rx="102.80769"
+       ry="57.115383" />
+    <rect
+       style="fill:#00ff00;stroke:#000000;stroke-width:0.264999"
+       id="rect7"
+       width="102.80769"
+       height="605.42303"
+       x="-4488.2925"
+       y="125.41698"
+       transform="rotate(14.430768)" />
+    <rect
+       style="fill:#00ff00;stroke:#000000;stroke-width:0.264999"
+       id="rect7-4"
+       width="102.80769"
+       height="605.42303"
+       x="-3603.5522"
+       y="-2050.9324"
+       transform="rotate(-15.901077)"
+       inkscape:transform-center-x="-319.84616"
+       inkscape:transform-center-y="-274.15385" />
+    <ellipse
+       style="opacity:0.545226;fill:#d40000;fill-opacity:0.86413;stroke:#000000;stroke-width:0.296634"
+       id="path9"
+       cx="2947.1538"
+       cy="-753.92303"
+       rx="68.522644"
+       ry="536.86877" />
+    <ellipse
+       style="fill:#00ff00;stroke:#000000;stroke-width:0.264999;filter:url(#filter17)"
+       id="path4-5"
+       cx="-4089.429"
+       cy="1976.0978"
+       rx="354.11539"
+       ry="342.69232"
+       inkscape:export-filename="aliens/alien.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="opacity:0.545226;fill:#00ff00;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999;filter:url(#filter18)"
+       id="path10"
+       cx="-3461.1924"
+       cy="1987.6154"
+       rx="605.42303"
+       ry="205.61539" />
+    <ellipse
+       style="opacity:0.545226;fill:#00ff00;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999;filter:url(#filter19)"
+       id="path11"
+       cx="755.38226"
+       cy="3722.3525"
+       rx="68.53846"
+       ry="382.6731"
+       transform="rotate(74.752163)" />
+    <ellipse
+       style="opacity:0.545226;fill:#00ff00;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999;filter:url(#filter20)"
+       id="path11-0"
+       cx="1086.3411"
+       cy="3007.4702"
+       rx="68.53846"
+       ry="382.6731"
+       transform="rotate(74.752163)" />
+    <ellipse
+       style="opacity:0.545226;fill:#00ff00;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999;filter:url(#filter21)"
+       id="path11-3"
+       cx="-1185.2886"
+       cy="4414.6572"
+       rx="68.53846"
+       ry="382.6731"
+       transform="rotate(43.147718)"
+       inkscape:transform-center-x="-148.47611"
+       inkscape:transform-center-y="-22.824477" />
+    <ellipse
+       style="opacity:0.545226;fill:#00ff00;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999;filter:url(#filter22)"
+       id="path11-0-7"
+       cx="2648.4771"
+       cy="2135.6616"
+       rx="68.53846"
+       ry="382.6731"
+       transform="rotate(101.97828)" />
+    <text
+       xml:space="preserve"
+       style="font-size:3.175px;writing-mode:lr-tb;direction:ltr;white-space:pre;inline-size:333.235;opacity:0.545226;fill:#24221c;fill-opacity:0.86413;stroke:#000000;stroke-width:0.264999"
+       x="-982.38458"
+       y="1987.6154"
+       id="text13" />
+    <text
+       xml:space="preserve"
+       transform="scale(0.26458333)"
+       id="text17"
+       style="fill:#000000;text-orientation:auto;stroke:#28220b;stroke-width:7.04881899;writing-mode:lr-tb;direction:ltr;opacity:1;fill-opacity:0.9619565;white-space:pre;shape-inside:url(#rect17);stroke-dasharray:none" />
+  </g>
+</svg>

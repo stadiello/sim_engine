@@ -63,7 +63,7 @@ public class Projectile extends GameObject {
 
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
         g2d.rotate(angle, x, y);
-        g2d.drawImage(imgShot, (int)x-4, (int)y-8, 8, 30, null);
+        g2d.drawImage(imgShot, (int)x + 5, (int)y - 23, 8, 30, null);
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
     }
     

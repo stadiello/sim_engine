@@ -2,9 +2,12 @@ package main;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.KeyboardFocusManager;
 
+import gameController.GameKeyController;
 import object.Alien;
 import object.Homme;
+import object.Protagonist;
 import object.Soldat;
 import object.ObjectManager;
 import world.TileManager;
@@ -18,6 +21,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int MAP_ROWS = 12;
     private static final int MAX_SPAWN_ATTEMPTS = 300;
     TileManager tileManager = new TileManager(this);
+    private final GameKeyController keyController = new GameKeyController();
 
     public GamePanel() {
         ObjectManager.setTileManager(tileManager);
@@ -29,7 +33,11 @@ public class GamePanel extends JPanel implements Runnable {
         }
         for (int i = 0; i < 2; i++) {
             double[] spawn = getFreeSpawnPosition();
-            ObjectManager.list.add(new Soldat(spawn[0], spawn[1]));
+            if (i == 0) {
+                ObjectManager.list.add(new Protagonist(spawn[0], spawn[1], keyController));
+            } else {
+                ObjectManager.list.add(new Soldat(spawn[0], spawn[1]));
+            }
         }
         for (int i = 0; i < 5; i++) {
             double[] spawn = getFreeSpawnPosition();
@@ -77,6 +85,7 @@ public class GamePanel extends JPanel implements Runnable {
         frame.add(gamePanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 600);
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(gamePanel.keyController);
         frame.setVisible(true);
         new Thread(gamePanel).start();
     }

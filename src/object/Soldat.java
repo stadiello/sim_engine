@@ -8,6 +8,7 @@ public class Soldat extends Homme {
 
     private static Image imgCorps;
     private static Image arme;
+    private static boolean shot = false;
 
     private int shootCooldown = 0;
 
@@ -55,6 +56,7 @@ public class Soldat extends Homme {
                 // le this est passé pour que le projectile ignore les collisions avec le soldat qui l'a tiré
                 ObjectManager.list.add(new Projectile(px, py, (dx / distance) * projectileSpeed, (dy / distance) * projectileSpeed, this));
                 shootCooldown = 25;
+                shot = true;
             }
         }
 
@@ -77,7 +79,13 @@ public class Soldat extends Homme {
 
         g2d.rotate(angle, x, y);
         g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
-        g2d.drawImage(arme, (int)x + 5, (int)y - 23 + offsetArme, 5, 30, null); // Arme dessinée à côté du corps avec un léger mouvement
+        if (shot == true) {
+            g2d.drawImage(arme, (int)x + 5, (int)y - 23 + offsetArme, 5, 30, null); // Arme dessinée à côté du corps avec un léger mouvement
+            shot = false;
+        } else {
+                    g2d.drawImage(arme, (int)x + 5, (int)y - 23, 5, 30, null); 
+        }
+
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
         
     }
