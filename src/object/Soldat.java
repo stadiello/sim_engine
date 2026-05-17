@@ -18,7 +18,7 @@ public class Soldat extends Homme {
     static {
         try {
             imgCorps = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/corps.png"));
-            arme = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/arme.png"));
+            arme = ImageIO.read(Soldat.class.getResourceAsStream("/assets/armes/blaster.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }

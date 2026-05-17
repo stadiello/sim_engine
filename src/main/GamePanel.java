@@ -29,6 +29,7 @@ public class GamePanel extends JPanel implements Runnable {
         ObjectManager.setTileManager(tileManager);
         addMouseMotionListener(keyController);
         addMouseListener(keyController);
+        addMouseWheelListener(keyController);
 
         // Cree une petite population initiale.
         for (int i = 0; i < 6; i++) {

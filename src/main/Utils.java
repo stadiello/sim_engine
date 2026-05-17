@@ -1,38 +1,78 @@
 package main;
 
-import java.net.URI;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
 
 public class Utils {
+
+	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4);
+	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10);
 
 	private Utils() {}
 
 	public static void playLaserSound() {
-		playSoundResource("/sound/laser.mp3");
+		LASER_POOL.play();
 	}
 
-	private static void playSoundResource(String resourcePath) {
-		URL soundUrl = Utils.class.getResource(resourcePath);
-		if (soundUrl == null) {
-			return;
+	public static void playSmgSound() {
+		SMG_POOL.play();
+	}
+
+	private static final class SoundPool {
+		private final List<Clip> clips = new ArrayList<>();
+		private int roundRobinIndex = 0;
+
+		SoundPool(String resourcePath, int poolSize) {
+			for (int i = 0; i < poolSize; i++) {
+				Clip clip = createClip(resourcePath);
+				if (clip != null) {
+					clips.add(clip);
+				}
+			}
 		}
 
-		Thread playerThread = new Thread(() -> {
-			try {
-				String osName = System.getProperty("os.name", "").toLowerCase();
-				if (!osName.contains("mac")) {
-					return;
-				}
-
-				URI uri = soundUrl.toURI();
-				ProcessBuilder processBuilder = new ProcessBuilder("afplay", uri.getPath());
-				processBuilder.start();
-			} catch (Exception e) {
-				// Ignore les erreurs audio pour ne jamais interrompre la boucle de jeu.
+		synchronized void play() {
+			if (clips.isEmpty()) {
+				return;
 			}
-		}, "laser-sound-player");
 
-		playerThread.setDaemon(true);
-		playerThread.start();
+			Clip clip = findAvailableClip();
+			if (clip == null) {
+				clip = clips.get(roundRobinIndex);
+				roundRobinIndex = (roundRobinIndex + 1) % clips.size();
+				clip.stop();
+			}
+
+			clip.setFramePosition(0);
+			clip.start();
+		}
+
+		private Clip findAvailableClip() {
+			for (Clip clip : clips) {
+				if (!clip.isRunning()) {
+					return clip;
+				}
+			}
+			return null;
+		}
+
+		private Clip createClip(String resourcePath) {
+			URL url = Utils.class.getResource(resourcePath);
+			if (url == null) {
+				return null;
+			}
+
+			try (AudioInputStream stream = AudioSystem.getAudioInputStream(url)) {
+				Clip clip = AudioSystem.getClip();
+				clip.open(stream);
+				return clip;
+			} catch (Exception e) {
+				return null;
+			}
+		}
 	}
 }

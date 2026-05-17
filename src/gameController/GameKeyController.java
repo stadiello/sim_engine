@@ -5,13 +5,17 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class GameKeyController implements KeyEventDispatcher, MouseMotionListener, MouseListener {
+public class GameKeyController implements KeyEventDispatcher, MouseMotionListener, MouseListener, MouseWheelListener {
     
     private boolean up, down, left, right;
     private volatile boolean leftClickPressed;
     private volatile int mouseX = 400;
     private volatile int mouseY = 300;
+    private final AtomicInteger weaponScrollDelta = new AtomicInteger(0);
 
     @Override
     public boolean dispatchKeyEvent(java.awt.event.KeyEvent e) {
@@ -38,6 +42,7 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public boolean isLeft() { return left; }
     public boolean isRight() { return right; }
     public boolean isLeftClickPressed() { return leftClickPressed; }
+    public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
 
     public int getMouseX() { return mouseX; }
     public int getMouseY() { return mouseY; }
@@ -76,4 +81,9 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
 
     @Override
     public void mouseExited(MouseEvent e) {}
+
+    @Override
+    public void mouseWheelMoved(MouseWheelEvent e) {
+        weaponScrollDelta.addAndGet(e.getWheelRotation());
+    }
 }

@@ -44,9 +44,19 @@ public class ObjectManager {
     }
 
     public static void drawAll(Graphics g) {
-        // la même chose pour le dessin, chaque objet sait comment se dessiner lui-même et on évite les problèmes de modification de la liste pendant le dessin
-        for (GameObject obj : new ArrayList<>(list)) {
-            obj.draw(g); // chaque objet sait comment se dessiner
+        // Dessine d'abord les douilles pour qu'elles restent sous les personnages.
+        ArrayList<GameObject> snapshot = new ArrayList<>(list);
+        for (GameObject obj : snapshot) {
+            if (obj instanceof Douille) {
+                obj.draw(g);
+            }
+        }
+
+        // Dessine ensuite tout le reste.
+        for (GameObject obj : snapshot) {
+            if (!(obj instanceof Douille)) {
+                obj.draw(g);
+            }
         }
     }
 }
