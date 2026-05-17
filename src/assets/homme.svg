@@ -26,9 +26,9 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
-     inkscape:zoom="0.023162177"
-     inkscape:cx="366.97759"
-     inkscape:cy="4403.7311"
+     inkscape:zoom="0.18529742"
+     inkscape:cx="982.20474"
+     inkscape:cy="5099.9092"
      inkscape:window-width="1512"
      inkscape:window-height="771"
      inkscape:window-x="0"
@@ -190,6 +190,158 @@
        inkscape:export-filename="bras_d.png"
        inkscape:export-xdpi="96"
        inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#808080;fill-opacity:0.961956;stroke:#28220b;stroke-width:1.865"
+       id="rect1"
+       width="102.80769"
+       height="788.19232"
+       x="1279.3845"
+       y="788.19232"
+       inkscape:export-filename="armes/carabine.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#000000;fill-opacity:0.961956;stroke:#28220b;stroke-width:1.865"
+       id="rect4"
+       width="57.115383"
+       height="399.80771"
+       x="1300.8029"
+       y="388.38461" />
+    <rect
+       style="fill:#000000;fill-opacity:0.961956;stroke:#28220b;stroke-width:1.865"
+       id="rect5"
+       width="57.115383"
+       height="144.21634"
+       x="1303.6586"
+       y="1113.75" />
+    <path
+       style="fill:#ffcc00;fill-opacity:0.961956;stroke:none;stroke-width:1.865"
+       id="path7"
+       sodipodi:type="arc"
+       sodipodi:cx="1243.9095"
+       sodipodi:cy="-763.30817"
+       sodipodi:rx="16.154671"
+       sodipodi:ry="36.348007"
+       sodipodi:start="0"
+       sodipodi:end="6.240696"
+       sodipodi:arc-type="slice"
+       d="m 1260.0642,-763.30817 a 16.154671,36.348007 0 0 1 -15.9831,36.34596 16.154671,36.348007 0 0 1 -16.3226,-35.57381 16.154671,36.348007 0 0 1 15.6363,-37.1017 16.154671,36.348007 0 0 1 16.6548,34.78562 l -16.1401,1.54393 z"
+       inkscape:export-filename="effets/bullet.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="opacity:0.703163;fill:#7c7c7c;fill-opacity:0.96195602;stroke:none;stroke-width:4.96429"
+       id="rect18"
+       width="33.077507"
+       height="648.2395"
+       x="1227.238"
+       y="-755.55829" />
+    <rect
+       style="opacity:1;fill:#ffcc00;fill-opacity:0.961956;stroke:none;stroke-width:1.865"
+       id="rect19"
+       width="32.309338"
+       height="88.850685"
+       x="1300.4509"
+       y="-783.50153"
+       inkscape:export-filename="effets/douille.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <circle
+       style="display:inline;fill:#aa0000;fill-opacity:1;stroke:#000000;stroke-width:0.265;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-2-0"
+       cx="-2249.4363"
+       cy="-534.07812"
+       r="308.42307"
+       inkscape:label="path1"
+       inkscape:export-filename="badGuys/ennemis.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <ellipse
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6-8-2"
+       cx="-2329.3979"
+       cy="-665.44348"
+       rx="57.115383"
+       ry="51.403847" />
+    <ellipse
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="path6-1-5-4"
+       cx="-2135.1943"
+       cy="-671.07532"
+       rx="57.115383"
+       ry="51.403847" />
+    <rect
+       style="fill:#ffdd55;fill-opacity:1;stroke:#000000;stroke-width:0.264999;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14-9-8"
+       width="79.961533"
+       height="559.73077"
+       x="-2486.0251"
+       y="113.25011"
+       inkscape:label="bras_gauche"
+       inkscape:export-filename="bras_g.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       transform="rotate(32.277425)" />
+    <rect
+       style="fill:#ffd42a;fill-opacity:1;stroke:#000000;stroke-width:0.196681;stroke-dasharray:none;stroke-opacity:1"
+       id="rect14-0-4-3"
+       width="75.387589"
+       height="327.03754"
+       x="-1936.2175"
+       y="-560.68433"
+       inkscape:label="bras_droit"
+       inkscape:export-filename="bras_d.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96"
+       transform="matrix(0.98035031,0.19726445,0.31173824,0.95016802,0,0)"
+       inkscape:transform-center-x="-35.926773"
+       inkscape:transform-center-y="32.682249" />
+    <rect
+       style="fill:#808080;fill-opacity:0.961956;stroke:#28220b;stroke-width:1.15018"
+       id="rect1-6"
+       width="103.52251"
+       height="297.71481"
+       x="656.33868"
+       y="1239.0319"
+       inkscape:export-filename="armes/glock.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <path
+       style="fill:#ffffff;fill-opacity:0.961956;stroke-width:1.865"
+       id="path3"
+       sodipodi:type="arc"
+       sodipodi:cx="688.95435"
+       sodipodi:cy="1502.1346"
+       sodipodi:rx="7.8533654"
+       sodipodi:ry="7.1394229"
+       sodipodi:start="0"
+       sodipodi:end="6.240696"
+       sodipodi:arc-type="slice"
+       d="m 696.80771,1502.1346 a 7.8533654,7.1394229 0 0 1 -7.76994,7.1391 7.8533654,7.1394229 0 0 1 -7.93502,-6.9874 7.8533654,7.1394229 0 0 1 7.60138,-7.2875 7.8533654,7.1394229 0 0 1 8.09649,6.8326 l -7.84627,0.3032 z" />
+    <path
+       style="fill:#ffffff;fill-opacity:0.961956;stroke-width:1.865"
+       id="path3-7"
+       sodipodi:type="arc"
+       sodipodi:cx="726.87885"
+       sodipodi:cy="1502.1992"
+       sodipodi:rx="7.8533654"
+       sodipodi:ry="7.1394229"
+       sodipodi:start="0"
+       sodipodi:end="6.240696"
+       sodipodi:arc-type="slice"
+       d="m 734.73221,1502.1992 a 7.8533654,7.1394229 0 0 1 -7.76995,7.139 7.8533654,7.1394229 0 0 1 -7.93501,-6.9873 7.8533654,7.1394229 0 0 1 7.60137,-7.2875 7.8533654,7.1394229 0 0 1 8.0965,6.8326 l -7.84627,0.3032 z" />
+    <path
+       style="fill:#ffffff;fill-opacity:0.961956;stroke-width:1.865"
+       id="path3-7-9"
+       sodipodi:type="arc"
+       sodipodi:cx="708.10083"
+       sodipodi:cy="1270.1384"
+       sodipodi:rx="7.8533654"
+       sodipodi:ry="7.1394229"
+       sodipodi:start="0"
+       sodipodi:end="6.240696"
+       sodipodi:arc-type="slice"
+       d="m 715.9542,1270.1384 a 7.8533654,7.1394229 0 0 1 -7.76995,7.139 7.8533654,7.1394229 0 0 1 -7.93501,-6.9873 7.8533654,7.1394229 0 0 1 7.60137,-7.2875 7.8533654,7.1394229 0 0 1 8.0965,6.8326 l -7.84628,0.3032 z" />
   </g>
   <g
      inkscape:groupmode="layer"

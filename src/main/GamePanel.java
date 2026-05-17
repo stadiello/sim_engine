@@ -6,6 +6,7 @@ import java.awt.KeyboardFocusManager;
 
 import gameController.GameKeyController;
 import object.Alien;
+import object.Ennemi;
 import object.Homme;
 import object.Protagonist;
 import object.Soldat;
@@ -20,6 +21,12 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int MAP_COLS = 16;
     private static final int MAP_ROWS = 12;
     private static final int MAX_SPAWN_ATTEMPTS = 300;
+        private static final int[][] ENEMY_SPAWN_ZONES = {
+            {7, 9, 1, 2},
+            {13, 14, 1, 2},
+            {1, 3, 8, 9},
+            {13, 14, 8, 9}
+        };
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
 
@@ -36,18 +43,57 @@ public class GamePanel extends JPanel implements Runnable {
             double[] spawn = getFreeSpawnPosition();
             ObjectManager.list.add(new Homme(spawn[0], spawn[1]));
         }
-        for (int i = 0; i < 2; i++) {
-            double[] spawn = getFreeSpawnPosition();
-            if (i == 0) {
-                ObjectManager.list.add(new Protagonist(spawn[0], spawn[1], keyController));
-            } else {
-                ObjectManager.list.add(new Soldat(spawn[0], spawn[1]));
-            }
-        }
+        double[] protagonistSpawn = getFreeSpawnPositionInZone(1, 3, 1, 2);
+        ObjectManager.list.add(new Protagonist(protagonistSpawn[0], protagonistSpawn[1], keyController));
+
+        // Garde un soldat allié près du protagoniste mais dans la même zone sécurisée.
+        double[] soldatSpawn = getFreeSpawnPositionInZone(1, 3, 1, 2);
+        ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
         for (int i = 0; i < 5; i++) {
             double[] spawn = getFreeSpawnPosition();
             ObjectManager.list.add(new Alien(spawn[0], spawn[1]));
         }
+        for (int i = 0; i < 4; i++) {
+            int[] zone = ENEMY_SPAWN_ZONES[i % ENEMY_SPAWN_ZONES.length];
+            double[] spawn = getFreeSpawnPositionInZone(zone[0], zone[1], zone[2], zone[3]);
+            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1]));
+        }
+    }
+
+    private double[] getFreeSpawnPositionInZone(int startCol, int endCol, int startRow, int endRow) {
+        int minCol = Math.max(0, Math.min(startCol, MAP_COLS - 1));
+        int maxCol = Math.max(0, Math.min(endCol, MAP_COLS - 1));
+        int minRow = Math.max(0, Math.min(startRow, MAP_ROWS - 1));
+        int maxRow = Math.max(0, Math.min(endRow, MAP_ROWS - 1));
+
+        if (minCol > maxCol || minRow > maxRow) {
+            return getFreeSpawnPosition();
+        }
+
+        for (int i = 0; i < MAX_SPAWN_ATTEMPTS; i++) {
+            int col = minCol + (int) (Math.random() * (maxCol - minCol + 1));
+            int row = minRow + (int) (Math.random() * (maxRow - minRow + 1));
+
+            double x = col * tileSize + tileSize / 2.0;
+            double y = row * tileSize + tileSize / 2.0;
+
+            if (isSpawnAreaFree(x, y, ENTITY_RADIUS)) {
+                return new double[]{x, y};
+            }
+        }
+
+        for (int row = minRow; row <= maxRow; row++) {
+            for (int col = minCol; col <= maxCol; col++) {
+                double x = col * tileSize + tileSize / 2.0;
+                double y = row * tileSize + tileSize / 2.0;
+
+                if (isSpawnAreaFree(x, y, ENTITY_RADIUS)) {
+                    return new double[]{x, y};
+                }
+            }
+        }
+
+        return getFreeSpawnPosition();
     }
 
     private double[] getFreeSpawnPosition() {
