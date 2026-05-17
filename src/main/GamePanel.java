@@ -23,8 +23,12 @@ public class GamePanel extends JPanel implements Runnable {
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
 
+    public static int score = 0;
+
     public GamePanel() {
         ObjectManager.setTileManager(tileManager);
+        addMouseMotionListener(keyController);
+        addMouseListener(keyController);
 
         // Cree une petite population initiale.
         for (int i = 0; i < 6; i++) {
@@ -130,6 +134,14 @@ public class GamePanel extends JPanel implements Runnable {
         tileManager.draw(g);    
         ObjectManager.drawAll(g);
         drawUI(g);
+    }
+
+    public void paintScore(Graphics g, int scoreHit) {
+        super.paintComponent(g);
+        g.setColor(Color.RED);
+        g.fillRect(0, 0, getWidth(), getHeight());
+        g.setColor(Color.WHITE);
+        g.drawString("Score: " + score, 10, 20);
     }
 
 }

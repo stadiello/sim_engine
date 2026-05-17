@@ -2,16 +2,21 @@ package object;
 
 import java.awt.*;
 import java.io.IOException;
+import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
 import gameController.*;
-import main.Utils;
+import object.ObjectManager;
+import object.ai.BotBrain;
 
-public class Protagonist extends Homme{
+
+public class BotProtagonist extends Homme{
 
     private static Image imgCorps;
     private static Image arme;
-    private boolean shot = false;
+    private static boolean shot = false;
+    private static ArrayList<GameObject> listEntite;
+    private BotBrain action;
 
     private static final double MOVE_SPEED = 2.6;
 
@@ -30,7 +35,7 @@ public class Protagonist extends Homme{
         }
     }
     
-    public Protagonist(double x, double y, GameKeyController keyController) {
+    public BotProtagonist(double x, double y, GameKeyController keyController) {
         super(x, y);
         this.keyController = keyController;
         vx = 0;
@@ -41,45 +46,10 @@ public class Protagonist extends Homme{
 
     @Override
     public void update() {
-        double inputX = 0;
-        double inputY = 0;
 
-        double toMouseX = keyController.getMouseX() - x;
-        double toMouseY = keyController.getMouseY() - y;
-        double mouseLength = Math.sqrt(toMouseX * toMouseX + toMouseY * toMouseY);
-
-        if (mouseLength > 0.0001) {
-            facingX = toMouseX / mouseLength;
-            facingY = toMouseY / mouseLength;
-        }
-
-        if (shootCooldown > 0) {
-                shootCooldown--;
-        }
-
-        if (keyController.isLeft()) inputX -= 1;
-        if (keyController.isRight()) inputX += 1;
-        if (keyController.isUp()) inputY -= 1;
-        if (keyController.isDown()) inputY += 1;
-        if (keyController.isLeftClickPressed() && shootCooldown == 0) {
-            double projectileSpeed = 6.5;
-            ObjectManager.list.add(new Projectile((int)x, (int)y, facingX * projectileSpeed, facingY * projectileSpeed, this));
-            Utils.playLaserSound();
-            shootCooldown = 15;
-            shot = true;
-        }
-
-        if (inputX != 0 || inputY != 0) {
-            double length = Math.sqrt(inputX * inputX + inputY * inputY);
-            double dirX = inputX / length;
-            double dirY = inputY / length;
-
-            vx = dirX * MOVE_SPEED;
-            vy = dirY * MOVE_SPEED;
-        } else {
-            vx = 0;
-            vy = 0;
-        }
+        listEntite = ObjectManager.list;
+        action = BotBrain(listEntite);
+    
 
         moveWithTileCollision(14);
         timer++;

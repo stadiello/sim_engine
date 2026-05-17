@@ -8,7 +8,7 @@ public class Soldat extends Homme {
 
     private static Image imgCorps;
     private static Image arme;
-    private static boolean shot = false;
+    private boolean shot = false;
 
     private int shootCooldown = 0;
 

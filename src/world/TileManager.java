@@ -41,7 +41,7 @@ public class TileManager {
         tiles[3] = new Tile(loadImage("/assets/tiles/wall.png"), true, false);
         tiles[4] = new Tile(loadImage("/assets/tiles/building.png"), true, false);
         tiles[5] = new Tile(loadImage("/assets/tiles/door.png"), false, true);
-        tiles[6] = new Tile(loadImage("/assets/tiles/tree.png"), true, false);
+        tiles[6] = new Tile(loadImage("/assets/tiles/decor_tree.png"), true, false);
     }
 
     private void loadCityMap() {

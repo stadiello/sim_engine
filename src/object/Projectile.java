@@ -4,6 +4,8 @@ import java.awt.*;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
+import main.GamePanel;
+
 public class Projectile extends GameObject {
 
     private static Image imgShot;
@@ -35,6 +37,7 @@ public class Projectile extends GameObject {
 
         if (!canMoveTo(x, y, 2)) {
             ObjectManager.list.remove(this);
+            ObjectManager.list.add(new ImpactSpark(x, y));
             return;
         }
 
@@ -45,7 +48,9 @@ public class Projectile extends GameObject {
                 double hy = homme.y - y;
                 if (hx * hx + hy * hy < 18 * 18) {
                     ObjectManager.list.remove(homme);
+                    ObjectManager.list.add(new ImpactSpark(x, y));
                     ObjectManager.list.remove(this);
+                    GamePanel.score += 10;
                     return;
                 }
             }
