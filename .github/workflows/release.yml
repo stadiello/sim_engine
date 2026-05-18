@@ -27,6 +27,7 @@ jobs:
           find src -name "*.java" > sources.txt
           javac -d out -sourcepath src @sources.txt
           cp -R src/assets out/assets
+          cp -R src/sound out/sound
           echo "Main-Class: main.GamePanel" > manifest.txt
           jar cfm dist/sim_engine.jar manifest.txt -C out .
 
@@ -67,6 +68,7 @@ jobs:
           find src -name "*.java" > sources.txt
           javac -d out -sourcepath src @sources.txt
           cp -R src/assets out/assets
+          cp -R src/sound out/sound
           echo "Main-Class: main.GamePanel" > manifest.txt
           jar cfm dist/sim_engine.jar manifest.txt -C out .
 
