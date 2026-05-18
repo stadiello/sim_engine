@@ -35,11 +35,6 @@ public class Projectile extends GameObject {
     private final Homme tireur; // Le tireur à ignorer lors des collisions
     private final ProjectileType type;
 
-    // // on utilise toujours homme car toutes les entité héritent de homme.
-    // public Projectile(double x, double y, double vx, double vy, Homme tireur) {
-    //     this(x, y, vx, vy, tireur, ProjectileType.DEFAULT);
-    // }
-
     public Projectile(double x, double y, double vx, double vy, Homme tireur, ProjectileType type) {
         super(x, y);
         this.vx = vx;

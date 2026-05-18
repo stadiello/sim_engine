@@ -158,11 +158,6 @@ public class Soldat extends Homme {
         return true;
     }
 
-    // @Override
-    // public void draw(Graphics g) {
-    //     g.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 32, null);
-    //     g.drawImage(arme, (int)x + 5, (int)y - 28, 5, 30, null); // Arme dessinée à côté du corps
-    // }
     @Override
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
@@ -179,7 +174,6 @@ public class Soldat extends Homme {
         } else {
                     g2d.drawImage(arme, (int)x + 5, (int)y - 23, 5, 30, null); 
         }
-
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
         
     }

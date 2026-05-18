@@ -32,16 +32,6 @@ public class Homme extends GameObject {
         moveWithTileCollision(14);
         timer++;
     }
-    
-    // public void draw(Graphics g) {
-    //     int offsetBras = (int)(Math.sin(timer * 0.15) * 6);
-
-    //     // bras gauche monte quand bras droit descend
-    //     g.drawImage(imgBrasG, (int)x - 20, (int)y - 16 - offsetBras, 10, 20, null);
-    //     g.drawImage(imgBrasD, (int)x + 10, (int)y - 16 + offsetBras, 10, 20, null);
-    //     // corps par dessus les bras
-    //     g.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 32, null);
-    // }
 
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;

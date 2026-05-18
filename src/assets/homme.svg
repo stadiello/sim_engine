@@ -26,13 +26,13 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
-     inkscape:zoom="0.18529742"
-     inkscape:cx="982.20474"
-     inkscape:cy="5099.9092"
+     inkscape:zoom="0.046324355"
+     inkscape:cx="3615.8086"
+     inkscape:cy="539.67292"
      inkscape:window-width="1512"
      inkscape:window-height="771"
      inkscape:window-x="0"
-     inkscape:window-y="33"
+     inkscape:window-y="30"
      inkscape:window-maximized="0"
      inkscape:current-layer="layer1" />
   <defs
@@ -342,6 +342,23 @@
        sodipodi:end="6.240696"
        sodipodi:arc-type="slice"
        d="m 715.9542,1270.1384 a 7.8533654,7.1394229 0 0 1 -7.76995,7.139 7.8533654,7.1394229 0 0 1 -7.93501,-6.9873 7.8533654,7.1394229 0 0 1 7.60137,-7.2875 7.8533654,7.1394229 0 0 1 8.0965,6.8326 l -7.84628,0.3032 z" />
+    <rect
+       style="fill:#c87137;fill-opacity:0.961956;stroke-width:1.865"
+       id="rect8"
+       width="91.384613"
+       height="833.88464"
+       x="1679.1923"
+       y="776.76923"
+       inkscape:export-filename="armes/fusilDeChasse.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#28220b;fill-opacity:0.961956;stroke-width:1.00968"
+       id="rect6"
+       width="45.692001"
+       height="1045.2115"
+       x="1702.0385"
+       y="245.59615" />
   </g>
   <g
      inkscape:groupmode="layer"

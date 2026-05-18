@@ -1,2 +1,6 @@
 *.class
 out/
+release/
+dist/sim_engine.jar
+manifest.txt
+sources.txt

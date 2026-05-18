@@ -16,6 +16,13 @@ import world.TileManager;
 
 public class GamePanel extends JPanel implements Runnable {
 
+    private enum ScreenState {
+        MENU,
+        OPTIONS,
+        PLAYING,
+        GAME_OVER
+    }
+
     // 50 correspond aux dimensions de la carte (800÷16=50, 600÷12=50), ce qui permet un affichage correct des tiles sur l'écran 800×600.
     public int tileSize = 50;
     private static final double ENTITY_RADIUS = 14;
@@ -24,6 +31,8 @@ public class GamePanel extends JPanel implements Runnable {
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
+    private ScreenState screenState = ScreenState.MENU;
+    private boolean paused = false;
 
     public static int score = 0;
 
@@ -32,6 +41,14 @@ public class GamePanel extends JPanel implements Runnable {
         addMouseMotionListener(keyController);
         addMouseListener(keyController);
         addMouseWheelListener(keyController);
+
+        initializeWorld();
+        updateCamera();
+    }
+
+    private void initializeWorld() {
+        ObjectManager.list.clear();
+        score = 0;
 
         // Cree une petite population initiale.
         for (int i = 0; i < 6; i++) {
@@ -69,8 +86,6 @@ public class GamePanel extends JPanel implements Runnable {
             );
             ObjectManager.list.add(new Ennemi(spawn[0], spawn[1]));
         }
-
-        updateCamera();
     }
 
     private int[][] buildEnemySpawnZones() {
@@ -265,9 +280,22 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void run() {
         while (true) {
-            applySoldierMoveCommand();
-            ObjectManager.updateAll();
-            updateCamera();
+            handleMenuInput();
+
+            if (screenState == ScreenState.PLAYING && keyController.consumePauseToggleTriggered()) {
+                paused = !paused;
+            }
+
+            if (screenState == ScreenState.PLAYING && !paused) {
+                applySoldierMoveCommand();
+                ObjectManager.updateAll();
+                if (findProtagonist() == null) {
+                    screenState = ScreenState.GAME_OVER;
+                    paused = false;
+                }
+                updateCamera();
+            }
+
             repaint();
             try {
                 Thread.sleep(16);
@@ -277,6 +305,75 @@ public class GamePanel extends JPanel implements Runnable {
                 break;
             }
         }
+    }
+
+    private void handleMenuInput() {
+        if (screenState == ScreenState.PLAYING) {
+            return;
+        }
+
+        if (!keyController.consumeLeftClickPressed()) {
+            return;
+        }
+
+        int mouseX = keyController.getMouseX();
+        int mouseY = keyController.getMouseY();
+
+        if (screenState == ScreenState.MENU) {
+            if (getPlayButtonBounds().contains(mouseX, mouseY)) {
+                screenState = ScreenState.PLAYING;
+                paused = false;
+            } else if (getOptionsButtonBounds().contains(mouseX, mouseY)) {
+                screenState = ScreenState.OPTIONS;
+            }
+            return;
+        }
+
+        if (screenState == ScreenState.OPTIONS && getBackButtonBounds().contains(mouseX, mouseY)) {
+            screenState = ScreenState.MENU;
+            return;
+        }
+
+        if (screenState == ScreenState.GAME_OVER && getReplayButtonBounds().contains(mouseX, mouseY)) {
+            initializeWorld();
+            screenState = ScreenState.PLAYING;
+            paused = false;
+        }
+    }
+
+    private Rectangle getPlayButtonBounds() {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int buttonWidth = 220;
+        int buttonHeight = 52;
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = panelHeight / 2 - 40;
+        return new Rectangle(x, y, buttonWidth, buttonHeight);
+    }
+
+    private Rectangle getOptionsButtonBounds() {
+        Rectangle play = getPlayButtonBounds();
+        return new Rectangle(play.x, play.y + 72, play.width, play.height);
+    }
+
+    private Rectangle getBackButtonBounds() {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int buttonWidth = 220;
+        int buttonHeight = 52;
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = panelHeight - 120;
+        return new Rectangle(x, y, buttonWidth, buttonHeight);
+    }
+
+    private Rectangle getReplayButtonBounds() {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int buttonWidth = 240;
+        int buttonHeight = 56;
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = panelHeight / 2 + 30;
+        return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
     private Protagonist findProtagonist() {
@@ -340,6 +437,113 @@ public class GamePanel extends JPanel implements Runnable {
         g.drawString("Soldats: " + soldats, 10, 40);
         g.drawString("Aliens: " + aliens, 10, 60);
         g.drawString("Casualties: " + (8 - civils - soldats), 10, 80);
+        g.drawString("P: Pause", 10, 100);
+    }
+
+    private void drawButton(Graphics2D g2d, Rectangle rect, String label) {
+        g2d.setColor(new Color(25, 25, 25, 210));
+        g2d.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 14, 14);
+        g2d.setColor(new Color(235, 235, 235));
+        g2d.setStroke(new BasicStroke(2f));
+        g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 14, 14);
+
+        Font oldFont = g2d.getFont();
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 24f));
+        FontMetrics fm = g2d.getFontMetrics();
+        int textX = rect.x + (rect.width - fm.stringWidth(label)) / 2;
+        int textY = rect.y + (rect.height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(label, textX, textY);
+        g2d.setFont(oldFont);
+    }
+
+    private void drawMenu(Graphics2D g2d) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+
+        g2d.setColor(new Color(0, 0, 0, 170));
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+
+        Font oldFont = g2d.getFont();
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 48f));
+        String title = "SIM ENGINE";
+        FontMetrics fm = g2d.getFontMetrics();
+        g2d.drawString(title, (panelWidth - fm.stringWidth(title)) / 2, panelHeight / 2 - 100);
+
+        drawButton(g2d, getPlayButtonBounds(), "Play");
+        drawButton(g2d, getOptionsButtonBounds(), "Options");
+
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 16f));
+        String hint = "Clique sur un bouton pour continuer";
+        FontMetrics hintFm = g2d.getFontMetrics();
+        g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight - 40);
+        g2d.setFont(oldFont);
+    }
+
+    private void drawOptions(Graphics2D g2d) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+
+        g2d.setColor(new Color(0, 0, 0, 185));
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+
+        Font oldFont = g2d.getFont();
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 40f));
+        String title = "Options";
+        FontMetrics titleFm = g2d.getFontMetrics();
+        g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, 130);
+
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 20f));
+        g2d.drawString("- P : mettre le jeu en pause/reprendre", 180, 220);
+        g2d.drawString("- Clic droit : envoyer le soldat", 180, 255);
+        g2d.drawString("- Clic gauche : tirer", 180, 290);
+
+        drawButton(g2d, getBackButtonBounds(), "Retour");
+        g2d.setFont(oldFont);
+    }
+
+    private void drawPauseOverlay(Graphics2D g2d) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+
+        g2d.setColor(new Color(0, 0, 0, 120));
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+        g2d.setColor(Color.WHITE);
+        Font oldFont = g2d.getFont();
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 48f));
+        String pausedText = "PAUSE";
+        FontMetrics fm = g2d.getFontMetrics();
+        g2d.drawString(pausedText, (panelWidth - fm.stringWidth(pausedText)) / 2, panelHeight / 2);
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 18f));
+        String hint = "Appuie sur P pour reprendre";
+        FontMetrics hintFm = g2d.getFontMetrics();
+        g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight / 2 + 36);
+        g2d.setFont(oldFont);
+    }
+
+    private void drawGameOverOverlay(Graphics2D g2d) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+
+        g2d.setColor(new Color(0, 0, 0, 170));
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+
+        Font oldFont = g2d.getFont();
+        g2d.setColor(new Color(255, 80, 80));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 54f));
+        String title = "VOUS ETES MORT";
+        FontMetrics titleFm = g2d.getFontMetrics();
+        g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, panelHeight / 2 - 40);
+
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 22f));
+        String scoreText = "Score final : " + score;
+        FontMetrics scoreFm = g2d.getFontMetrics();
+        g2d.drawString(scoreText, (panelWidth - scoreFm.stringWidth(scoreText)) / 2, panelHeight / 2);
+
+        drawButton(g2d, getReplayButtonBounds(), "Rejouer");
+        g2d.setFont(oldFont);
     }
 
     public void paintComponent(Graphics g) {
@@ -350,7 +554,19 @@ public class GamePanel extends JPanel implements Runnable {
         tileManager.draw(g2d);
         ObjectManager.drawAll(g2d);
         g2d.setTransform(old);
-        drawUI(g);
+
+        if (screenState == ScreenState.PLAYING) {
+            drawUI(g);
+            if (paused) {
+                drawPauseOverlay(g2d);
+            }
+        } else if (screenState == ScreenState.GAME_OVER) {
+            drawGameOverOverlay(g2d);
+        } else if (screenState == ScreenState.MENU) {
+            drawMenu(g2d);
+        } else if (screenState == ScreenState.OPTIONS) {
+            drawOptions(g2d);
+        }
     }
 
     public void paintScore(Graphics g, int scoreHit) {

@@ -15,6 +15,8 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     private volatile boolean leftClickPressed;
     private volatile boolean leftClickTriggered;
     private volatile boolean rightClickTriggered;
+    private volatile boolean pauseToggleTriggered;
+    private boolean pauseKeyPressed;
     private volatile int mouseX = 400;
     private volatile int mouseY = 300;
     private volatile int rightClickX = 400;
@@ -37,6 +39,16 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
             case KeyEvent.VK_LEFT, KeyEvent.VK_Q, KeyEvent.VK_A -> left = pressed;
             // Droite: fleche droite, D
             case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> right = pressed;
+            case KeyEvent.VK_P -> {
+                if (pressed) {
+                    if (!pauseKeyPressed) {
+                        pauseToggleTriggered = true;
+                    }
+                    pauseKeyPressed = true;
+                } else {
+                    pauseKeyPressed = false;
+                }
+            }
         }
         return false; // Ne pas consommer l'événement
     }
@@ -58,6 +70,11 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     }
     public int getRightClickX() { return rightClickX; }
     public int getRightClickY() { return rightClickY; }
+    public boolean consumePauseToggleTriggered() {
+        boolean wasTriggered = pauseToggleTriggered;
+        pauseToggleTriggered = false;
+        return wasTriggered;
+    }
     public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
 
     public int getMouseX() { return mouseX; }
