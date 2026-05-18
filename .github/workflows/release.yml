@@ -35,8 +35,7 @@ jobs:
             --input dist \
             --main-jar sim_engine.jar \
             --main-class main.GamePanel \
-            --dest release \
-            --overwrite
+            --dest release
 
           ditto -c -k --sequesterRsrc --keepParent release/SimEngine.app SimEngine-macOS.zip
 
@@ -79,8 +78,7 @@ jobs:
             --main-class main.GamePanel \
             --dest release \
             --win-shortcut \
-            --win-menu \
-            --overwrite
+            --win-menu 
 
       - name: Upload Windows artifact to release
         uses: softprops/action-gh-release@v2

@@ -1,7 +1,5 @@
-rm -rf out dist
-rm -rf release
+rm -rf out dist release
 rm -f manifest.txt sources.txt
-rm -rf release SimEngine.app
 
 find . -name "*.class" -delete
 mkdir -p out/assets
