@@ -5,6 +5,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import main.GamePanel;
+import world.TileManager;
 
 public class Projectile extends GameObject {
 
@@ -75,7 +76,11 @@ public class Projectile extends GameObject {
 
         vie--;
 
-        if (vie <= 0 || x < 0 || x > 800 || y < 0 || y > 600) {
+        TileManager tileManager = ObjectManager.getTileManager();
+        double maxX = tileManager != null ? tileManager.getWorldWidth() : 800;
+        double maxY = tileManager != null ? tileManager.getWorldHeight() : 600;
+
+        if (vie <= 0 || x < 0 || x > maxX || y < 0 || y > maxY) {
             ObjectManager.list.remove(this); // Supprime le projectile après sa durée de vie
         }
     }

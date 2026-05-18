@@ -14,7 +14,7 @@ public class Douille extends GameObject {
     private static final double BOUNCE_FACTOR = 0.45;
     private static final double FRICTION_FACTOR = 0.9;
     private static final double STOP_SPEED_SQ = 0.02;
-    private static final int REST_FRAMES = 90;
+    private static final int REST_FRAMES = 200; // 200 frames à 60 FPS = 3.33 secondes de repos avant disparition, 90 frames à 60 FPS = 1.5 secondes de repos avant disparition
 
     static {
         try {

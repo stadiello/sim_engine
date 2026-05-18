@@ -6,6 +6,7 @@ import javax.imageio.ImageIO;
 
 import gameController.*;
 import object.weapon.Weapon;
+import world.TileManager;
 
 public class Protagonist extends Homme{
 
@@ -44,8 +45,12 @@ public class Protagonist extends Homme{
         double inputX = 0;
         double inputY = 0;
 
-        double toMouseX = keyController.getMouseX() - x;
-        double toMouseY = keyController.getMouseY() - y;
+        TileManager tileManager = ObjectManager.getTileManager();
+        int cameraX = tileManager != null ? tileManager.getCameraX() : 0;
+        int cameraY = tileManager != null ? tileManager.getCameraY() : 0;
+
+        double toMouseX = (keyController.getMouseX() + cameraX) - x;
+        double toMouseY = (keyController.getMouseY() + cameraY) - y;
         double mouseLength = Math.sqrt(toMouseX * toMouseX + toMouseY * toMouseY);
 
         if (mouseLength > 0.0001) {
