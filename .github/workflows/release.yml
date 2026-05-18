@@ -1,0 +1,88 @@
+name: Build release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build JAR
+        run: |
+          rm -rf out dist release
+          mkdir -p out dist release
+          find src -name "*.java" > sources.txt
+          javac -d out -sourcepath src @sources.txt
+          cp -R src/assets out/assets
+          echo "Main-Class: main.GamePanel" > manifest.txt
+          jar cfm dist/sim_engine.jar manifest.txt -C out .
+
+      - name: Build macOS app
+        run: |
+          jpackage \
+            --type app-image \
+            --name SimEngine \
+            --input dist \
+            --main-jar sim_engine.jar \
+            --main-class main.GamePanel \
+            --dest release \
+            --overwrite
+
+          ditto -c -k --sequesterRsrc --keepParent release/SimEngine.app SimEngine-macOS.zip
+
+      - name: Upload macOS artifact to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SimEngine-macOS.zip
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build JAR
+        shell: bash
+        run: |
+          rm -rf out dist release
+          mkdir -p out dist release
+          find src -name "*.java" > sources.txt
+          javac -d out -sourcepath src @sources.txt
+          cp -R src/assets out/assets
+          echo "Main-Class: main.GamePanel" > manifest.txt
+          jar cfm dist/sim_engine.jar manifest.txt -C out .
+
+      - name: Build Windows exe
+        shell: bash
+        run: |
+          jpackage \
+            --type exe \
+            --name SimEngine \
+            --input dist \
+            --main-jar sim_engine.jar \
+            --main-class main.GamePanel \
+            --dest release \
+            --win-shortcut \
+            --win-menu \
+            --overwrite
+
+      - name: Upload Windows artifact to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.exe

@@ -1,4 +1,16 @@
 rm -rf out dist
+rm -rf release
+rm -f manifest.txt sources.txt
+rm -rf release SimEngine.app
+
+find . -name "*.class" -delete
+mkdir -p out/assets
+cp -R src/assets/* out/assets/
+mkdir -p out/sound
+cp -R src/sound/* out/sound/
+
+javac -d out -sourcepath src src/main/GamePanel.java
+
 mkdir -p out dist
 find src -name "*.java" > sources.txt
 javac -d out -sourcepath src @sources.txt
@@ -13,6 +25,6 @@ jpackage \
   --main-jar sim_engine.jar \
   --main-class main.GamePanel \
   --dest release \
-  --overwrite
+  # --overwrite
 
 zip -r SimEngine.zip release/SimEngine.app
