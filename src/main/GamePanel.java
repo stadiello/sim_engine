@@ -48,7 +48,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         // Garde un soldat allié près du protagoniste mais dans la même zone sécurisée.
         double[] soldatSpawn = getFreeSpawnPositionInZone(1, 3, 1, 2);
-        ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
+        // ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
         for (int i = 0; i < 5; i++) {
             double[] spawn = getFreeSpawnPosition();
             ObjectManager.list.add(new Alien(spawn[0], spawn[1]));

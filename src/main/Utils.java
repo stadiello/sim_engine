@@ -11,6 +11,8 @@ public class Utils {
 
 	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4);
 	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10);
+	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5);
+	private static final SoundPool SHOTGUN_POOL = new SoundPool("/sound/shotGun.wav", 3);
 
 	private Utils() {}
 
@@ -20,6 +22,14 @@ public class Utils {
 
 	public static void playSmgSound() {
 		SMG_POOL.play();
+	}
+
+	public static void playPistolSound() {
+		PISTOL_POOL.play();
+	}
+
+	public static void playShotgunSound() {
+		SHOTGUN_POOL.play();
 	}
 
 	private static final class SoundPool {

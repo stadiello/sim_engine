@@ -10,16 +10,20 @@ public class Projectile extends GameObject {
 
     private static Image imgShot;
     private static Image imgBullet;
+    private static Image imgShotgunPellet;
 
     public enum ProjectileType {
         DEFAULT,
-        BULLET
+        BULLET,
+        SHOTGUN_PELLET
     }
 
     static {
         try {
             imgShot = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/shot_effect.png"));
             imgBullet = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/bullet.png"));
+            // Utilise le shot_effect pour les pellets aussi (ou créer une image spécifique)
+            imgShotgunPellet = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/bullet.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -30,10 +34,10 @@ public class Projectile extends GameObject {
     private final Homme tireur; // Le tireur à ignorer lors des collisions
     private final ProjectileType type;
 
-    // on utilise toujours homme car toutes les entité héritent de homme.
-    public Projectile(double x, double y, double vx, double vy, Homme tireur) {
-        this(x, y, vx, vy, tireur, ProjectileType.DEFAULT);
-    }
+    // // on utilise toujours homme car toutes les entité héritent de homme.
+    // public Projectile(double x, double y, double vx, double vy, Homme tireur) {
+    //     this(x, y, vx, vy, tireur, ProjectileType.DEFAULT);
+    // }
 
     public Projectile(double x, double y, double vx, double vy, Homme tireur, ProjectileType type) {
         super(x, y);
@@ -79,11 +83,13 @@ public class Projectile extends GameObject {
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
         boolean isBullet = type == ProjectileType.BULLET;
-        Image projectileImage = isBullet ? imgBullet : imgShot;
-        int projectileWidth = isBullet ? 2 : 8;
-        int projectileHeight = isBullet ? 12 : 30;
-        int projectileX = isBullet ? (int)x + 8 : (int)x + 5;
-        int projectileY = isBullet ? (int)y - 14 : (int)y - 23;
+        boolean isPellet = type == ProjectileType.SHOTGUN_PELLET;
+        
+        Image projectileImage = isPellet ? imgShotgunPellet : (isBullet ? imgBullet : imgShot);
+        int projectileWidth = isPellet ? 4 : (isBullet ? 2 : 8);
+        int projectileHeight = isPellet ? 6 : (isBullet ? 12 : 30);
+        int projectileX = isPellet ? (int)x + 3 : (isBullet ? (int)x + 8 : (int)x + 5);
+        int projectileY = isPellet ? (int)y - 10 : (isBullet ? (int)y - 14 : (int)y - 23);
 
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
         g2d.rotate(angle, x, y);

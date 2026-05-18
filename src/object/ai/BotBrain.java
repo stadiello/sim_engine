@@ -11,7 +11,7 @@ public class BotBrain {
     private static final double CHASE_SPEED = 1.9;
     private static final double STOP_AND_SHOOT_RANGE = 220.0;
     private static final int SHOOT_COOLDOWN_FRAMES = 34;
-    private static final double BULLET_SPEED = 5.6;
+    private static final double BULLET_SPEED = 8.2;
 
     private int shootCooldown = 0;
 

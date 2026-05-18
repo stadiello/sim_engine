@@ -13,6 +13,7 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     
     private boolean up, down, left, right;
     private volatile boolean leftClickPressed;
+    private volatile boolean leftClickTriggered;
     private volatile int mouseX = 400;
     private volatile int mouseY = 300;
     private final AtomicInteger weaponScrollDelta = new AtomicInteger(0);
@@ -42,6 +43,11 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public boolean isLeft() { return left; }
     public boolean isRight() { return right; }
     public boolean isLeftClickPressed() { return leftClickPressed; }
+    public boolean consumeLeftClickPressed() {
+        boolean wasTriggered = leftClickTriggered;
+        leftClickTriggered = false;
+        return wasTriggered;
+    }
     public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
 
     public int getMouseX() { return mouseX; }
@@ -63,6 +69,7 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public void mousePressed(MouseEvent e) {
         if (e.getButton() == MouseEvent.BUTTON1) {
             leftClickPressed = true;
+            leftClickTriggered = true;
         }
     }
 

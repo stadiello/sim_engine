@@ -10,6 +10,9 @@ import object.ai.BotBrain;
 
 public class Ennemi extends Homme {
 
+    private static final int GLOCK_DRAW_WIDTH = 6;
+    private static final int GLOCK_DRAW_HEIGHT = 16;
+
     private static Image imgEnnemi;
     private static Image imgArme;
 
@@ -83,7 +86,7 @@ public class Ennemi extends Homme {
         g2d.rotate(angle, x, y);
         g2d.drawImage(imgEnnemi, (int) x - 16, (int) y - 16, 32, 32, null);
         if (imgArme != null) {
-            g2d.drawImage(imgArme, (int) x + 5, (int) y - 20 + weaponKickback, 9, 24, null);
+            g2d.drawImage(imgArme, (int) x + 5, (int) y - 20 + weaponKickback, GLOCK_DRAW_WIDTH, GLOCK_DRAW_HEIGHT, null);
         }
         g2d.setTransform(old);
     }

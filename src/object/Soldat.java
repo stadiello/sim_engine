@@ -34,32 +34,6 @@ public class Soldat extends Homme {
     public void update() {
         Alien target = ObjectManager.getNearestAlien(x, y);
 
-        if (target != null) {
-            double dx = target.x - x;
-            double dy = target.y - y;
-            double distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance > 0) {
-                double speed = 2.4;
-                vx = (dx / distance) * speed;
-                vy = (dy / distance) * speed;
-            }
-
-            if (shootCooldown > 0) {
-                shootCooldown--;
-            }
-
-            if (distance > 0 && distance < 260 && shootCooldown == 0) {
-                double projectileSpeed = 6.5;
-                double px = x + (dx / distance) * 18;
-                double py = y + (dy / distance) * 18;
-                // le this est passé pour que le projectile ignore les collisions avec le soldat qui l'a tiré
-                ObjectManager.list.add(new Projectile(px, py, (dx / distance) * projectileSpeed, (dy / distance) * projectileSpeed, this));
-                shootCooldown = 25;
-                shot = true;
-            }
-        }
-
         moveWithTileCollision(14);
         timer++;
     }
