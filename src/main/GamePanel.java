@@ -45,7 +45,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         // Garde un soldat allié près du protagoniste mais dans la même zone sécurisée.
         double[] soldatSpawn = getFreeSpawnPositionInZone(5, Math.min(8, tileManager.getMapCols() - 2), 4, Math.min(7, tileManager.getMapRows() - 2));
-        // ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
+        ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
         for (int i = 0; i < 5; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(
                     protagonistSpawnX,
@@ -56,7 +56,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         int[][] enemySpawnZones = buildEnemySpawnZones();
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 6; i++) {
             int[] zone = enemySpawnZones[i % enemySpawnZones.length];
             double[] spawn = getFreeSpawnPositionInZoneFarFrom(
                     zone[0],
@@ -265,6 +265,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void run() {
         while (true) {
+            applySoldierMoveCommand();
             ObjectManager.updateAll();
             updateCamera();
             repaint();
@@ -285,6 +286,30 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
         return null;
+    }
+
+    private Soldat findSoldat() {
+        for (GameObject obj : ObjectManager.list) {
+            if (obj instanceof Soldat soldat) {
+                return soldat;
+            }
+        }
+        return null;
+    }
+
+    private void applySoldierMoveCommand() {
+        if (!keyController.consumeRightClickTriggered()) {
+            return;
+        }
+
+        Soldat soldat = findSoldat();
+        if (soldat == null) {
+            return;
+        }
+
+        double worldX = keyController.getRightClickX() + tileManager.getCameraX();
+        double worldY = keyController.getRightClickY() + tileManager.getCameraY();
+        soldat.moveTo(worldX, worldY);
     }
 
     private void updateCamera() {

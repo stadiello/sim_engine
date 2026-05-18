@@ -14,8 +14,11 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     private boolean up, down, left, right;
     private volatile boolean leftClickPressed;
     private volatile boolean leftClickTriggered;
+    private volatile boolean rightClickTriggered;
     private volatile int mouseX = 400;
     private volatile int mouseY = 300;
+    private volatile int rightClickX = 400;
+    private volatile int rightClickY = 300;
     private final AtomicInteger weaponScrollDelta = new AtomicInteger(0);
 
     @Override
@@ -48,6 +51,13 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
         leftClickTriggered = false;
         return wasTriggered;
     }
+    public boolean consumeRightClickTriggered() {
+        boolean wasTriggered = rightClickTriggered;
+        rightClickTriggered = false;
+        return wasTriggered;
+    }
+    public int getRightClickX() { return rightClickX; }
+    public int getRightClickY() { return rightClickY; }
     public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
 
     public int getMouseX() { return mouseX; }
@@ -70,6 +80,10 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
         if (e.getButton() == MouseEvent.BUTTON1) {
             leftClickPressed = true;
             leftClickTriggered = true;
+        } else if (e.getButton() == MouseEvent.BUTTON3 || e.isPopupTrigger()) {
+            rightClickX = e.getX();
+            rightClickY = e.getY();
+            rightClickTriggered = true;
         }
     }
 
@@ -77,6 +91,10 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public void mouseReleased(MouseEvent e) {
         if (e.getButton() == MouseEvent.BUTTON1) {
             leftClickPressed = false;
+        } else if (e.getButton() == MouseEvent.BUTTON3 || e.isPopupTrigger()) {
+            rightClickX = e.getX();
+            rightClickY = e.getY();
+            rightClickTriggered = true;
         }
     }
 

@@ -2,9 +2,9 @@ package object.ai;
 
 import object.Douille;
 import object.Ennemi;
+import object.Homme;
 import object.ObjectManager;
 import object.Projectile;
-import object.Protagonist;
 import world.TileManager;
 
 public class BotBrain {
@@ -21,7 +21,7 @@ public class BotBrain {
             shootCooldown--;
         }
 
-        Protagonist target = getNearestProtagonist(enemy.x, enemy.y);
+        Homme target = ObjectManager.getNearestAlliedTarget(enemy.x, enemy.y);
         if (target == null) {
             enemy.vx = 0;
             enemy.vy = 0;
@@ -76,25 +76,6 @@ public class BotBrain {
         double shellRotationSpeed = (Math.random() - 0.5) * 0.28;
 
         ObjectManager.list.add(new Douille(shellX, shellY, shellVx, shellVy, shellAngle, shellRotationSpeed));
-    }
-
-    private Protagonist getNearestProtagonist(double x, double y) {
-        Protagonist nearest = null;
-        double bestDist = Double.MAX_VALUE;
-
-        for (var obj : ObjectManager.list) {
-            if (obj instanceof Protagonist protagonist) {
-                double dx = protagonist.x - x;
-                double dy = protagonist.y - y;
-                double dist = dx * dx + dy * dy;
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    nearest = protagonist;
-                }
-            }
-        }
-
-        return nearest;
     }
 
     private boolean hasLineOfSight(double fromX, double fromY, double toX, double toY) {
