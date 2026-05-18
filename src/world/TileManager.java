@@ -36,14 +36,24 @@ public class TileManager {
 
     }
 
+    // private void loadTiles() {
+    //     tiles[0] = new Tile(loadImage("/assets/tiles/road.png"), false, false);
+    //     tiles[1] = new Tile(loadImage("/assets/tiles/sidewalk.png"), false, false);
+    //     tiles[2] = new Tile(loadImage("/assets/tiles/grass.png"), false, false);
+    //     tiles[3] = new Tile(loadImage("/assets/tiles/wall.png"), true, false);
+    //     tiles[4] = new Tile(loadImage("/assets/tiles/building.png"), true, false);
+    //     tiles[5] = new Tile(loadImage("/assets/tiles/door.png"), false, true);
+    //     tiles[6] = new Tile(loadImage("/assets/tiles/decor_tree.png"), true, false);
+    // }
+
     private void loadTiles() {
-        tiles[0] = new Tile(loadImage("/assets/tiles/road.png"), false, false);
-        tiles[1] = new Tile(loadImage("/assets/tiles/sidewalk.png"), false, false);
-        tiles[2] = new Tile(loadImage("/assets/tiles/grass.png"), false, false);
-        tiles[3] = new Tile(loadImage("/assets/tiles/wall.png"), true, false);
-        tiles[4] = new Tile(loadImage("/assets/tiles/building.png"), true, false);
-        tiles[5] = new Tile(loadImage("/assets/tiles/door.png"), false, true);
-        tiles[6] = new Tile(loadImage("/assets/tiles/decor_tree.png"), true, false);
+        tiles[0] = new Tile(TileGenerator.generateRoad(), false, false);
+        tiles[1] = new Tile(TileGenerator.generateSidewalk(), false, false);
+        tiles[2] = new Tile(TileGenerator.generateGrass(), false, false);
+        tiles[3] = new Tile(TileGenerator.generateWall(), true, false);
+        tiles[4] = new Tile(TileGenerator.generateBuilding(), true, false);
+        tiles[5] = new Tile(TileGenerator.generateDoor(), false, true);
+        tiles[6] = new Tile(TileGenerator.generateTree(), true, false);
     }
 
     private void loadCityMap() {
