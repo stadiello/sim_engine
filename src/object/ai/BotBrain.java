@@ -5,6 +5,7 @@ import object.Ennemi;
 import object.ObjectManager;
 import object.Projectile;
 import object.Protagonist;
+import world.TileManager;
 
 public class BotBrain {
 
@@ -31,10 +32,11 @@ public class BotBrain {
         double dy = target.y - enemy.y;
         double distSq = dx * dx + dy * dy;
         double dist = Math.sqrt(distSq);
+        boolean hasLineOfSight = hasLineOfSight(enemy.x, enemy.y, target.x, target.y);
 
         enemy.setFacingDirection(dx, dy);
 
-        if (distSq <= STOP_AND_SHOOT_RANGE * STOP_AND_SHOOT_RANGE) {
+        if (distSq <= STOP_AND_SHOOT_RANGE * STOP_AND_SHOOT_RANGE && hasLineOfSight) {
             enemy.vx = 0;
             enemy.vy = 0;
             if (shootCooldown == 0 && dist > 0.0001) {
@@ -93,5 +95,33 @@ public class BotBrain {
         }
 
         return nearest;
+    }
+
+    private boolean hasLineOfSight(double fromX, double fromY, double toX, double toY) {
+        TileManager tileManager = ObjectManager.getTileManager();
+        if (tileManager == null) {
+            return true;
+        }
+
+        double dx = toX - fromX;
+        double dy = toY - fromY;
+        double distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < 0.0001) {
+            return true;
+        }
+
+        double step = 4.0;
+        int steps = Math.max(1, (int) (distance / step));
+
+        for (int i = 1; i < steps; i++) {
+            double t = i / (double) steps;
+            double sampleX = fromX + dx * t;
+            double sampleY = fromY + dy * t;
+            if (tileManager.isBlockedAtPixel(sampleX, sampleY)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
