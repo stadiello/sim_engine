@@ -309,7 +309,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void handleMenuInput() {
-        if (screenState == ScreenState.PLAYING) {
+        if (screenState == ScreenState.PLAYING && !paused) {
             return;
         }
 
@@ -319,6 +319,14 @@ public class GamePanel extends JPanel implements Runnable {
 
         int mouseX = keyController.getMouseX();
         int mouseY = keyController.getMouseY();
+
+        if (screenState == ScreenState.PLAYING && paused) {
+            if (getPauseMenuButtonBounds().contains(mouseX, mouseY)) {
+                paused = false;
+                screenState = ScreenState.MENU;
+            }
+            return;
+        }
 
         if (screenState == ScreenState.MENU) {
             if (getFreeModeButtonBounds().contains(mouseX, mouseY)) {
@@ -347,6 +355,16 @@ public class GamePanel extends JPanel implements Runnable {
             screenState = ScreenState.PLAYING;
             paused = false;
         }
+    }
+
+    private Rectangle getPauseMenuButtonBounds() {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int buttonWidth = 220;
+        int buttonHeight = 48;
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = panelHeight / 2 + 70;
+        return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
     private Rectangle getFreeModeButtonBounds() {
@@ -534,6 +552,8 @@ public class GamePanel extends JPanel implements Runnable {
         FontMetrics hintFm = g2d.getFontMetrics();
         g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight / 2 + 36);
         g2d.setFont(oldFont);
+
+        drawButton(g2d, getPauseMenuButtonBounds(), "Menu principal");
     }
 
     private void drawGameOverOverlay(Graphics2D g2d) {
