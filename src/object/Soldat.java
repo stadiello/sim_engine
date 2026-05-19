@@ -13,6 +13,8 @@ public class Soldat extends Homme {
     private static final double ATTACK_RANGE = 260.0;
     private static final double FOLLOW_DISTANCE = 90.0;
     private static final double ARRIVAL_RADIUS = 12.0;
+    private static final int LOS_CHECK_INTERVAL_FRAMES = 4;
+    private static final double EPSILON_DIST_SQ = 0.00000001;
     private static final Weapon WEAPON = Weapon.blaster();
     private static Image imgCorps;
     private static Image arme;
@@ -26,6 +28,9 @@ public class Soldat extends Homme {
     private double destinationY;
     private double facingX = 0;
     private double facingY = -1;
+    private int losCheckCooldown = 0;
+    private Homme losCachedTarget;
+    private boolean losCachedVisible;
 
 
     static {
@@ -62,13 +67,13 @@ public class Soldat extends Homme {
             double dx = target.x - x;
             double dy = target.y - y;
             double distanceSq = dx * dx + dy * dy;
-            double distance = Math.sqrt(distanceSq);
-            if (distance > 0.0001) {
-                facingX = dx / distance;
-                facingY = dy / distance;
+            if (distanceSq > EPSILON_DIST_SQ) {
+                double invDistance = 1.0 / Math.sqrt(distanceSq);
+                facingX = dx * invDistance;
+                facingY = dy * invDistance;
             }
 
-            if (distanceSq <= ATTACK_RANGE * ATTACK_RANGE && hasLineOfSight(target.x, target.y)) {
+            if (distanceSq <= ATTACK_RANGE * ATTACK_RANGE && canSeeTarget(target)) {
                 vx = 0;
                 vy = 0;
                 hasAttackTarget = true;
@@ -92,18 +97,20 @@ public class Soldat extends Homme {
         if (hasDestination) {
             double dx = destinationX - x;
             double dy = destinationY - y;
-            double distance = Math.sqrt(dx * dx + dy * dy);
+            double distanceSq = dx * dx + dy * dy;
+            double arrivalRadiusSq = ARRIVAL_RADIUS * ARRIVAL_RADIUS;
 
-            if (distance <= ARRIVAL_RADIUS) {
+            if (distanceSq <= arrivalRadiusSq) {
                 vx = 0;
                 vy = 0;
                 return;
             }
 
-            vx = dx / distance * MOVE_SPEED;
-            vy = dy / distance * MOVE_SPEED;
-            facingX = vx / MOVE_SPEED;
-            facingY = vy / MOVE_SPEED;
+            double invDistance = 1.0 / Math.sqrt(distanceSq);
+            vx = dx * invDistance * MOVE_SPEED;
+            vy = dy * invDistance * MOVE_SPEED;
+            facingX = dx * invDistance;
+            facingY = dy * invDistance;
             return;
         }
 
@@ -111,13 +118,15 @@ public class Soldat extends Homme {
         if (protagonist != null) {
             double dx = protagonist.x - x;
             double dy = protagonist.y - y;
-            double distance = Math.sqrt(dx * dx + dy * dy);
+            double distanceSq = dx * dx + dy * dy;
+            double followDistanceSq = FOLLOW_DISTANCE * FOLLOW_DISTANCE;
 
-            if (distance > FOLLOW_DISTANCE) {
-                vx = dx / distance * MOVE_SPEED;
-                vy = dy / distance * MOVE_SPEED;
-                facingX = dx / distance;
-                facingY = dy / distance;
+            if (distanceSq > followDistanceSq && distanceSq > EPSILON_DIST_SQ) {
+                double invDistance = 1.0 / Math.sqrt(distanceSq);
+                vx = dx * invDistance * MOVE_SPEED;
+                vy = dy * invDistance * MOVE_SPEED;
+                facingX = dx * invDistance;
+                facingY = dy * invDistance;
                 return;
             }
 
@@ -130,6 +139,26 @@ public class Soldat extends Homme {
         vy = 0;
     }
 
+    private boolean canSeeTarget(Homme target) {
+        if (target == null) {
+            return false;
+        }
+
+        if (target != losCachedTarget) {
+            losCachedTarget = target;
+            losCheckCooldown = 0;
+        }
+
+        if (losCheckCooldown <= 0) {
+            losCachedVisible = hasLineOfSight(target.x, target.y);
+            losCheckCooldown = LOS_CHECK_INTERVAL_FRAMES;
+        } else {
+            losCheckCooldown--;
+        }
+
+        return losCachedVisible;
+    }
+
     private boolean hasLineOfSight(double targetX, double targetY) {
         TileManager tileManager = ObjectManager.getTileManager();
         if (tileManager == null) {
@@ -138,13 +167,12 @@ public class Soldat extends Homme {
 
         double dx = targetX - x;
         double dy = targetY - y;
-        double distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < 0.0001) {
+        if (dx * dx + dy * dy < EPSILON_DIST_SQ) {
             return true;
         }
 
         double step = 4.0;
-        int steps = Math.max(1, (int) (distance / step));
+        int steps = Math.max(1, (int) (Math.max(Math.abs(dx), Math.abs(dy)) / step));
 
         for (int i = 1; i < steps; i++) {
             double t = i / (double) steps;

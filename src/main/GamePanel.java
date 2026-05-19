@@ -17,6 +17,9 @@ import world.TileManager;
 
 public class GamePanel extends JPanel implements Runnable {
 
+    private static final int TARGET_UPS = 60;
+    private static final long NANOS_PER_UPDATE = 1_000_000_000L / TARGET_UPS;
+
     private enum ScreenState {
         MENU,
         OPTIONS,
@@ -280,31 +283,58 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public void run() {
+        long previousTime = System.nanoTime();
+        long accumulator = 0L;
+
         while (true) {
+            long currentTime = System.nanoTime();
+            long elapsed = currentTime - previousTime;
+            previousTime = currentTime;
+            accumulator += elapsed;
+
+            int updates = 0;
+            while (accumulator >= NANOS_PER_UPDATE && updates < 5) {
+                updateGameStep();
+                accumulator -= NANOS_PER_UPDATE;
+                updates++;
+            }
+
             handleMenuInput();
 
-            if (screenState == ScreenState.PLAYING && keyController.consumePauseToggleTriggered()) {
-                paused = !paused;
-            }
-
-            if (screenState == ScreenState.PLAYING && !paused) {
-                applySoldierMoveCommand();
-                ObjectManager.updateAll();
-                if (findProtagonist() == null) {
-                    screenState = ScreenState.GAME_OVER;
-                    paused = false;
-                }
-                updateCamera();
-            }
-
             repaint();
-            try {
-                Thread.sleep(16);
+
+            long sleepNanos = NANOS_PER_UPDATE - accumulator;
+            if (sleepNanos <= 0) {
+                Thread.yield();
+                continue;
             }
-            catch (InterruptedException e) {
+
+            try {
+                long sleepMillis = sleepNanos / 1_000_000L;
+                int sleepNanoPart = (int) (sleepNanos % 1_000_000L);
+                if (sleepMillis > 0 || sleepNanoPart > 0) {
+                    Thread.sleep(sleepMillis, sleepNanoPart);
+                }
+            } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             }
+        }
+    }
+
+    private void updateGameStep() {
+        if (screenState == ScreenState.PLAYING && keyController.consumePauseToggleTriggered()) {
+            paused = !paused;
+        }
+
+        if (screenState == ScreenState.PLAYING && !paused) {
+            applySoldierMoveCommand();
+            ObjectManager.updateAll();
+            if (ObjectManager.getProtagonist() == null) {
+                screenState = ScreenState.GAME_OVER;
+                paused = false;
+            }
+            updateCamera();
         }
     }
 
@@ -441,7 +471,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void updateCamera() {
-        Protagonist protagonist = findProtagonist();
+        Protagonist protagonist = ObjectManager.getProtagonist();
         if (protagonist == null) {
             return;
         }

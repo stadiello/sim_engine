@@ -12,9 +12,14 @@ public class BotBrain {
     private static final double CHASE_SPEED = 1.9;
     private static final double STOP_AND_SHOOT_RANGE = 220.0;
     private static final int SHOOT_COOLDOWN_FRAMES = 34;
+    private static final int LOS_CHECK_INTERVAL_FRAMES = 4;
+    private static final double EPSILON_DIST_SQ = 0.00000001;
     private static final double BULLET_SPEED = 8.2;
 
     private int shootCooldown = 0;
+    private int losCheckCooldown = 0;
+    private Homme losCachedTarget;
+    private boolean losCachedVisible;
 
     public void update(Ennemi enemy) {
         if (shootCooldown > 0) {
@@ -31,17 +36,23 @@ public class BotBrain {
         double dx = target.x - enemy.x;
         double dy = target.y - enemy.y;
         double distSq = dx * dx + dy * dy;
-        double dist = Math.sqrt(distSq);
-        boolean hasLineOfSight = hasLineOfSight(enemy.x, enemy.y, target.x, target.y);
+        if (distSq <= EPSILON_DIST_SQ) {
+            enemy.vx = 0;
+            enemy.vy = 0;
+            return;
+        }
+
+        double invDist = 1.0 / Math.sqrt(distSq);
+        boolean hasLineOfSight = canSeeTarget(enemy, target, distSq);
 
         enemy.setFacingDirection(dx, dy);
 
         if (distSq <= STOP_AND_SHOOT_RANGE * STOP_AND_SHOOT_RANGE && hasLineOfSight) {
             enemy.vx = 0;
             enemy.vy = 0;
-            if (shootCooldown == 0 && dist > 0.0001) {
-                double dirX = dx / dist;
-                double dirY = dy / dist;
+            if (shootCooldown == 0) {
+                double dirX = dx * invDist;
+                double dirY = dy * invDist;
 
                 ObjectManager.list.add(new Projectile(
                         enemy.x + dirX * 12,
@@ -58,8 +69,30 @@ public class BotBrain {
             return;
         }
 
-        enemy.vx = (dx / dist) * CHASE_SPEED;
-        enemy.vy = (dy / dist) * CHASE_SPEED;
+        enemy.vx = dx * invDist * CHASE_SPEED;
+        enemy.vy = dy * invDist * CHASE_SPEED;
+    }
+
+    private boolean canSeeTarget(Ennemi enemy, Homme target, double distSq) {
+        if (distSq > STOP_AND_SHOOT_RANGE * STOP_AND_SHOOT_RANGE) {
+            losCachedTarget = null;
+            losCheckCooldown = 0;
+            return false;
+        }
+
+        if (target != losCachedTarget) {
+            losCachedTarget = target;
+            losCheckCooldown = 0;
+        }
+
+        if (losCheckCooldown <= 0) {
+            losCachedVisible = hasLineOfSight(enemy.x, enemy.y, target.x, target.y);
+            losCheckCooldown = LOS_CHECK_INTERVAL_FRAMES;
+        } else {
+            losCheckCooldown--;
+        }
+
+        return losCachedVisible;
     }
 
     private void spawnDouille(Ennemi enemy, double dirX, double dirY) {
@@ -86,13 +119,12 @@ public class BotBrain {
 
         double dx = toX - fromX;
         double dy = toY - fromY;
-        double distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < 0.0001) {
+        if (dx * dx + dy * dy < EPSILON_DIST_SQ) {
             return true;
         }
 
         double step = 4.0;
-        int steps = Math.max(1, (int) (distance / step));
+        int steps = Math.max(1, (int) (Math.max(Math.abs(dx), Math.abs(dy)) / step));
 
         for (int i = 1; i < steps; i++) {
             double t = i / (double) steps;
