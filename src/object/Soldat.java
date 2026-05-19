@@ -4,21 +4,22 @@ import java.awt.*;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
+import object.ai.AiTuning;
+import object.ai.TacticalMovement;
 import object.weapon.Weapon;
-import world.TileManager;
 
 public class Soldat extends Homme {
 
-    private static final double MOVE_SPEED = 2.4;
-    private static final double ATTACK_RANGE = 260.0;
-    private static final double FOLLOW_DISTANCE = 90.0;
-    private static final double ARRIVAL_RADIUS = 12.0;
-    private static final int LOS_CHECK_INTERVAL_FRAMES = 4;
-    private static final double EPSILON_DIST_SQ = 0.00000001;
-    private static final Weapon WEAPON = Weapon.blaster();
+    private static final double MOVE_SPEED = 2.4; // Vitesse de déplacement de base du soldat, utilisée pour calculer la vélocité désirée. La vitesse réelle peut être réduite par les obstacles et les ajustements de mouvement tactique.
+    private static final double FOLLOW_DISTANCE = 90.0; // Distance à laquelle le soldat commence à suivre le protagoniste s'il n'a pas de cible, pour éviter qu'il ne reste trop loin ou qu'il ne se rapproche trop quand le joueur est à proximité
+    private static final double ARRIVAL_RADIUS = 12.0; // Distance à laquelle le soldat considère être arrivé à destination, pour éviter les oscillations et les calculs inutiles de direction quand il est très proche de la cible
+    private static final int LOS_CHECK_INTERVAL_FRAMES = 4; // Combien de frames attendre avant de refaire un check de ligne de vue, pour économiser du CPU. Un nombre plus élevé rend les ennemis moins réactifs à l'apparition soudaine d'une cible, mais réduit les saccades quand il y a beaucoup d'ennemis à l'écran.
+    private static final double EPSILON_DIST_SQ = 0.00000001; // Seuil pour éviter les divisions par zéro et les calculs inutiles de direction quand la cible est très proche
+    private static final double ENTITY_RADIUS = 14.0; // Rayon utilisé pour les vérifications de collision et de ligne de vue, pas forcément égal à la moitié de la taille du sprite
+    private static final int COVER_MEMORY_FRAMES = 22; // Combien de temps le soldat "se souvient" d'un point de couverture avant de chercher un nouveau (en frames)
+    private static final double VELOCITY_BLEND = 0.34; // Plus élevé = mouvements plus réactifs mais plus saccadés, plus bas = mouvements plus fluides mais plus lents à réagir
     private static Image imgCorps;
-    private static Image arme;
-    private boolean shot = false;
+    private int shotAnimTimer = 0;
 
     private int shootCooldown = 0;
 
@@ -31,12 +32,21 @@ public class Soldat extends Homme {
     private int losCheckCooldown = 0;
     private Homme losCachedTarget;
     private boolean losCachedVisible;
+    private int reactionDelayTimer = 0;
+    private int aimSettleTimer = 0;
+    private Homme focusedTarget;
+    private final Weapon carriedWeapon;
+    private int strafeSign = Math.random() < 0.5 ? -1 : 1;
+    private int strafeSwitchTimer = 0;
+    private int coverMemoryTimer = 0;
+    private double coverX;
+    private double coverY;
+    private int commandMovePriorityFrames = 0;
 
 
     static {
         try {
             imgCorps = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/corps.png"));
-            arme = ImageIO.read(Soldat.class.getResourceAsStream("/assets/armes/blaster.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -44,48 +54,115 @@ public class Soldat extends Homme {
 
     public Soldat(double x, double y) {
         super(x, y);
+        carriedWeapon = pickSoldierWeapon();
         vx = (Math.random() - 0.5) * 3; // Soldats plus rapides que les civils
         vy = (Math.random() - 0.5) * 3;
+    }
+
+    private static Weapon pickSoldierWeapon() {
+        double r = Math.random();
+        if (r < 0.45) {
+            return Weapon.blaster();
+        }
+        if (r < 0.82) {
+            return Weapon.carabine();
+        }
+        if (r < 0.95) {
+            return Weapon.glock();
+        }
+        return Weapon.shotgun();
     }
 
     public void moveTo(double targetX, double targetY) {
         destinationX = targetX;
         destinationY = targetY;
         hasDestination = true;
+        commandMovePriorityFrames = 120;
     }
 
     @Override
     public void update() {
+        tickSuppression();
+
+        if (commandMovePriorityFrames > 0) {
+            commandMovePriorityFrames--;
+        }
+
         if (shootCooldown > 0) {
             shootCooldown--;
+        }
+        if (shotAnimTimer > 0) {
+            shotAnimTimer--;
         }
 
         Homme target = ObjectManager.getNearestHostileForSoldat(x, y);
         boolean hasAttackTarget = false;
 
         if (target != null) {
+            if (focusedTarget != target) {
+                focusedTarget = target;
+                reactionDelayTimer = AiTuning.getSoldierReactionFrames();
+                aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+            }
+
             double dx = target.x - x;
             double dy = target.y - y;
             double distanceSq = dx * dx + dy * dy;
+            double engageRange = carriedWeapon.getAiEngageRange();
+            double retreatRange = carriedWeapon.getAiRetreatRange();
+            double optimalRange = carriedWeapon.getAiOptimalRange();
             if (distanceSq > EPSILON_DIST_SQ) {
                 double invDistance = 1.0 / Math.sqrt(distanceSq);
-                facingX = dx * invDistance;
-                facingY = dy * invDistance;
+                setFacingDirection(dx * invDistance, dy * invDistance);
             }
 
-            if (distanceSq <= ATTACK_RANGE * ATTACK_RANGE && canSeeTarget(target)) {
+            boolean hasLos = canSeeTarget(target);
+            double distance = distanceSq > EPSILON_DIST_SQ ? Math.sqrt(distanceSq) : 0.0;
+
+            if (reactionDelayTimer > 0 && !hasDestination) {
+                reactionDelayTimer--;
                 vx = 0;
                 vy = 0;
-                hasAttackTarget = true;
-                if (shootCooldown == 0) {
-                    WEAPON.fire(this, facingX, facingY);
-                    shootCooldown = WEAPON.getCooldownFrames();
-                    shot = true;
+                timer++;
+                return;
+            }
+
+            if (hasLos) {
+                if (aimSettleTimer > 0) {
+                    aimSettleTimer--;
+                }
+            } else {
+                aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+            }
+
+            if (!hasDestination && shouldSeekCover(hasLos, distance, optimalRange)) {
+                if (moveToCover(target, optimalRange)) {
+                    moveWithTileCollision(14);
+                    timer++;
+                    return;
                 }
             }
+
+            if (!hasDestination && hasLos && distanceSq <= engageRange * engageRange) {
+                applyCombatMovement(dx, dy, distance, retreatRange, optimalRange);
+                hasAttackTarget = true;
+                if (shootCooldown == 0 && aimSettleTimer <= 0) {
+                    carriedWeapon.fire(this, facingX, facingY);
+                    shootCooldown = carriedWeapon.getCooldownFrames();
+                    shotAnimTimer = 4;
+                    aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+                }
+            }
+        } else {
+            focusedTarget = null;
         }
 
         if (!hasAttackTarget) {
+            if (coverMemoryTimer > 0) {
+                coverMemoryTimer--;
+            } else {
+                clearCover();
+            }
             updateMovement();
             moveWithTileCollision(14);
         }
@@ -103,14 +180,17 @@ public class Soldat extends Homme {
             if (distanceSq <= arrivalRadiusSq) {
                 vx = 0;
                 vy = 0;
+                hasDestination = false;
+                commandMovePriorityFrames = 0;
                 return;
             }
 
             double invDistance = 1.0 / Math.sqrt(distanceSq);
-            vx = dx * invDistance * MOVE_SPEED;
-            vy = dy * invDistance * MOVE_SPEED;
-            facingX = dx * invDistance;
-            facingY = dy * invDistance;
+            double desiredVx = dx * invDistance * MOVE_SPEED;
+            double desiredVy = dy * invDistance * MOVE_SPEED;
+            double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
+            applySmoothedVelocity(adjusted[0], adjusted[1]);  // Applique la vélocité ajustée pour éviter les obstacles
+            setFacingDirection(dx * invDistance, dy * invDistance); // Oriente le soldat vers sa destination
             return;
         }
 
@@ -123,10 +203,11 @@ public class Soldat extends Homme {
 
             if (distanceSq > followDistanceSq && distanceSq > EPSILON_DIST_SQ) {
                 double invDistance = 1.0 / Math.sqrt(distanceSq);
-                vx = dx * invDistance * MOVE_SPEED;
-                vy = dy * invDistance * MOVE_SPEED;
-                facingX = dx * invDistance;
-                facingY = dy * invDistance;
+                double desiredVx = dx * invDistance * MOVE_SPEED;
+                double desiredVy = dy * invDistance * MOVE_SPEED;
+                double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
+                applySmoothedVelocity(adjusted[0], adjusted[1]);
+                setFacingDirection(dx * invDistance, dy * invDistance);
                 return;
             }
 
@@ -150,7 +231,7 @@ public class Soldat extends Homme {
         }
 
         if (losCheckCooldown <= 0) {
-            losCachedVisible = hasLineOfSight(target.x, target.y);
+            losCachedVisible = TacticalMovement.hasLineOfSight(x, y, target.x, target.y);
             losCheckCooldown = LOS_CHECK_INTERVAL_FRAMES;
         } else {
             losCheckCooldown--;
@@ -159,31 +240,138 @@ public class Soldat extends Homme {
         return losCachedVisible;
     }
 
-    private boolean hasLineOfSight(double targetX, double targetY) {
-        TileManager tileManager = ObjectManager.getTileManager();
-        if (tileManager == null) {
-            return true;
+    private boolean shouldSeekCover(boolean hasLos, double distance, double optimalRange) {
+        double suppressionBonus = isSuppressed() ? AiTuning.getSuppressionCoverBoost() * getSuppressionLevel() : 0.0;
+
+        if (!hasLos) {
+            return distance <= carriedWeapon.getAiEngageRange() * (1.20 + suppressionBonus * 0.4);
         }
 
-        double dx = targetX - x;
-        double dy = targetY - y;
-        if (dx * dx + dy * dy < EPSILON_DIST_SQ) {
-            return true;
-        }
+        int cooldownFrames = Math.max(1, carriedWeapon.getCooldownFrames());
+        double ratio = shootCooldown / (double) cooldownFrames;
+        double threshold = Math.max(0.12, 0.45 - suppressionBonus * 0.22);
+        return ratio >= threshold && distance <= optimalRange * 1.35;
+    }
 
-        double step = 4.0;
-        int steps = Math.max(1, (int) (Math.max(Math.abs(dx), Math.abs(dy)) / step));
-
-        for (int i = 1; i < steps; i++) {
-            double t = i / (double) steps;
-            double sampleX = x + dx * t;
-            double sampleY = y + dy * t;
-            if (tileManager.isBlockedAtPixel(sampleX, sampleY)) {
+    private boolean moveToCover(Homme target, double preferredRange) {
+        if (coverMemoryTimer <= 0 || !TacticalMovement.hasLineOfSight(x, y, coverX, coverY)) {
+            double[] cover = TacticalMovement.findCoverPoint(x, y, target.x, target.y, ENTITY_RADIUS, preferredRange);
+            if (cover == null) {
+                clearCover();
                 return false;
             }
+
+            coverX = cover[0];
+            coverY = cover[1];
+            coverMemoryTimer = COVER_MEMORY_FRAMES;
+        }
+
+        double dx = coverX - x;
+        double dy = coverY - y;
+        double distSq = dx * dx + dy * dy;
+        if (distSq <= ARRIVAL_RADIUS * ARRIVAL_RADIUS) {
+            applySmoothedVelocity(0, 0);
+            return true;
+        }
+
+        double invDistance = 1.0 / Math.sqrt(distSq);
+        double desiredVx = dx * invDistance * MOVE_SPEED;
+        double desiredVy = dy * invDistance * MOVE_SPEED;
+        double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
+        applySmoothedVelocity(adjusted[0], adjusted[1]);
+
+        double toTargetX = target.x - x;
+        double toTargetY = target.y - y;
+        double toTargetLen = Math.sqrt(toTargetX * toTargetX + toTargetY * toTargetY);
+        if (toTargetLen > 0.0001) {
+            setFacingDirection(toTargetX / toTargetLen, toTargetY / toTargetLen);
         }
 
         return true;
+    }
+
+    private void applyCombatMovement(double dx, double dy, double distance, double retreatRange, double optimalRange) {
+        if (strafeSwitchTimer <= 0) {
+            strafeSign = Math.random() < 0.5 ? -1 : 1;
+            strafeSwitchTimer = 24 + (int) (Math.random() * 28);
+        } else {
+            strafeSwitchTimer--;
+        }
+
+        if (distance <= 0.0001) {
+            applySmoothedVelocity(0, 0);
+            return;
+        }
+
+        double invDistance = 1.0 / distance;
+        double dirX = dx * invDistance;
+        double dirY = dy * invDistance;
+
+        double forwardFactor = 0;
+        if (distance < retreatRange) {
+            forwardFactor = -1.0;
+        } else if (distance > optimalRange) {
+            forwardFactor = carriedWeapon.isShotgun() ? 0.70 : 0.30;
+        }
+
+        double strafeFactor = carriedWeapon.isShotgun() ? 0.30 : 0.80;
+        double perpX = -dirY * strafeSign;
+        double perpY = dirX * strafeSign;
+
+        double desiredVx = (dirX * forwardFactor + perpX * strafeFactor) * MOVE_SPEED;
+        double desiredVy = (dirY * forwardFactor + perpY * strafeFactor) * MOVE_SPEED;
+        double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
+        applySmoothedVelocity(adjusted[0], adjusted[1]);
+    }
+
+    private void clearCover() {
+        coverMemoryTimer = 0;
+    }
+
+    private void setFacingDirection(double targetX, double targetY) {
+        double targetLen = Math.sqrt(targetX * targetX + targetY * targetY);
+        if (targetLen <= 0.0001) {
+            return;
+        }
+
+        double nx = targetX / targetLen;
+        double ny = targetY / targetLen;
+        double currentAngle = Math.atan2(facingY, facingX);
+        double targetAngle = Math.atan2(ny, nx);
+        double delta = normalizeAngle(targetAngle - currentAngle);
+
+        double maxTurn = Math.toRadians(8.5);
+        if (Math.abs(delta) <= maxTurn) {
+            facingX = nx;
+            facingY = ny;
+            return;
+        }
+
+        double nextAngle = currentAngle + Math.copySign(maxTurn, delta);
+        facingX = Math.cos(nextAngle);
+        facingY = Math.sin(nextAngle);
+    }
+
+    private static double normalizeAngle(double angle) {
+        while (angle > Math.PI) {
+            angle -= Math.PI * 2;
+        }
+        while (angle < -Math.PI) {
+            angle += Math.PI * 2;
+        }
+        return angle;
+    }
+
+    // Applique une vélocité lissée pour éviter les mouvements saccadés tout en restant réactif
+    private void applySmoothedVelocity(double desiredVx, double desiredVy) {
+        vx = vx * (1.0 - VELOCITY_BLEND) + desiredVx * VELOCITY_BLEND;
+        vy = vy * (1.0 - VELOCITY_BLEND) + desiredVy * VELOCITY_BLEND;
+        if (Math.abs(vx) < 0.01) {
+            vx = 0;
+        }
+        if (Math.abs(vy) < 0.01) {
+            vy = 0;
+        }
     }
 
     @Override
@@ -191,17 +379,11 @@ public class Soldat extends Homme {
         Graphics2D g2d = (Graphics2D) g;
 
         double angle = Math.atan2(facingY, facingX) + Math.PI / 2; // Calcul de l'angle de rotation
-        int offsetArme = (int)(Math.sin(timer * 0.15) * 6);
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
 
         g2d.rotate(angle, x, y);
         g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
-        if (shot == true) {
-            g2d.drawImage(arme, (int)x + 5, (int)y - 23 + offsetArme, 5, 30, null); // Arme dessinée à côté du corps avec un léger mouvement
-            shot = false;
-        } else {
-                    g2d.drawImage(arme, (int)x + 5, (int)y - 23, 5, 30, null); 
-        }
+        carriedWeapon.draw(g2d, x, y, timer, shotAnimTimer > 0);
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
         
     }

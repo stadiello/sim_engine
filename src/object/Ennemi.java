@@ -12,16 +12,13 @@ import main.GameMode;
 
 public class Ennemi extends Homme {
 
-    private static final int GLOCK_DRAW_WIDTH = 6;
-    private static final int GLOCK_DRAW_HEIGHT = 16;
+    private static final double MAX_TURN_PER_FRAME_RAD = Math.toRadians(10.0);
 
     private static Image imgEnnemi;
-    private static Image imgArme;
 
     static {
         try {
             imgEnnemi = ImageIO.read(Ennemi.class.getResourceAsStream("/assets/badGuys/ennemis.png"));
-            imgArme = ImageIO.read(Ennemi.class.getResourceAsStream("/assets/armes/glock.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -72,10 +69,35 @@ public class Ennemi extends Homme {
 
     public void setFacingDirection(double dx, double dy) {
         double len = Math.sqrt(dx * dx + dy * dy);
-        if (len > 0.0001) {
-            facingX = dx / len;
-            facingY = dy / len;
+        if (len <= 0.0001) {
+            return;
         }
+
+        double targetX = dx / len;
+        double targetY = dy / len;
+        double currentAngle = Math.atan2(facingY, facingX);
+        double targetAngle = Math.atan2(targetY, targetX);
+        double delta = normalizeAngle(targetAngle - currentAngle);
+
+        if (Math.abs(delta) <= MAX_TURN_PER_FRAME_RAD) {
+            facingX = targetX;
+            facingY = targetY;
+            return;
+        }
+
+        double nextAngle = currentAngle + Math.copySign(MAX_TURN_PER_FRAME_RAD, delta);
+        facingX = Math.cos(nextAngle);
+        facingY = Math.sin(nextAngle);
+    }
+
+    private static double normalizeAngle(double angle) {
+        while (angle > Math.PI) {
+            angle -= Math.PI * 2;
+        }
+        while (angle < -Math.PI) {
+            angle += Math.PI * 2;
+        }
+        return angle;
     }
 
     public double getFacingX() {
@@ -84,6 +106,10 @@ public class Ennemi extends Homme {
 
     public double getFacingY() {
         return facingY;
+    }
+
+    public Weapon getCarriedWeapon() {
+        return carriedWeapon;
     }
 
     public void onShot() {
@@ -98,14 +124,11 @@ public class Ennemi extends Homme {
 
         Graphics2D g2d = (Graphics2D) g;
         double angle = Math.atan2(facingY, facingX) + Math.PI / 2;
-        int weaponKickback = shotAnimTimer > 0 ? 3 : 0;
         var old = g2d.getTransform();
 
         g2d.rotate(angle, x, y);
         g2d.drawImage(imgEnnemi, (int) x - 16, (int) y - 16, 32, 32, null);
-        if (imgArme != null) {
-            g2d.drawImage(imgArme, (int) x + 5, (int) y - 20 + weaponKickback, GLOCK_DRAW_WIDTH, GLOCK_DRAW_HEIGHT, null);
-        }
+        carriedWeapon.draw(g2d, x, y, shotAnimTimer, shotAnimTimer > 0);
         g2d.setTransform(old);
     }
 }

@@ -4,6 +4,8 @@ import java.awt.*;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
+import object.ai.AiTuning;
+
 public class Homme extends GameObject {
 
     private static Image imgCorps;
@@ -21,6 +23,7 @@ public class Homme extends GameObject {
     }
 
     private int timer = 0;
+    private int suppressionFrames = 0;
     
     public Homme(double x, double y) {
         super(x, y);
@@ -29,8 +32,34 @@ public class Homme extends GameObject {
     }
 
     public void update() {
+        tickSuppression();
         moveWithTileCollision(14);
         timer++;
+    }
+
+    public void onIncomingFire(Homme attacker, double intensity) {
+        if (intensity <= 0) {
+            return;
+        }
+
+        double clamped = Math.max(0.15, Math.min(1.0, intensity));
+        int add = (int) Math.round(AiTuning.getSuppressionDurationFrames() * clamped);
+        suppressionFrames = Math.min(500, suppressionFrames + add);
+    }
+
+    public void tickSuppression() {
+        if (suppressionFrames > 0) {
+            suppressionFrames--;
+        }
+    }
+
+    public boolean isSuppressed() {
+        return suppressionFrames > 0;
+    }
+
+    public double getSuppressionLevel() {
+        int duration = Math.max(1, AiTuning.getSuppressionDurationFrames());
+        return Math.min(1.0, suppressionFrames / (double) duration);
     }
 
     public void draw(Graphics g) {

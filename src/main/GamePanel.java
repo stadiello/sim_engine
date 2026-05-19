@@ -5,10 +5,9 @@ import java.awt.*;
 import java.awt.KeyboardFocusManager;
 
 import gameController.GameKeyController;
-import main.GameMode;
+import object.ai.AiTuning;
 import object.Alien;
 import object.Ennemi;
-import object.GameObject;
 import object.Homme;
 import object.Protagonist;
 import object.Soldat;
@@ -27,11 +26,18 @@ public class GamePanel extends JPanel implements Runnable {
         GAME_OVER
     }
 
+    private int nombreCivil = 5;
+    private int nombreEnnemi = 10;
+    private int nombreAlien = 5;
+
     // 50 correspond aux dimensions de la carte (800÷16=50, 600÷12=50), ce qui permet un affichage correct des tiles sur l'écran 800×600.
     public int tileSize = 50;
     private static final double ENTITY_RADIUS = 14;
     private static final int MAX_SPAWN_ATTEMPTS = 300;
     private static final double SAFE_HOSTILE_SPAWN_DISTANCE = 520;
+    private static final int AI_OPTIONS_BASE_Y = 292;
+    private static final int AI_OPTION_ROW_GAP = 34;
+    private static final int AI_OPTION_COUNT = 7;
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
@@ -55,7 +61,7 @@ public class GamePanel extends JPanel implements Runnable {
         score = 0;
 
         // Cree une petite population initiale.
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < nombreCivil; i++) {
             double[] spawn = getFreeSpawnPosition();
             ObjectManager.list.add(new Homme(spawn[0], spawn[1]));
         }
@@ -67,7 +73,8 @@ public class GamePanel extends JPanel implements Runnable {
         // Garde un soldat allié près du protagoniste mais dans la même zone sécurisée.
         double[] soldatSpawn = getFreeSpawnPositionInZone(5, Math.min(8, tileManager.getMapCols() - 2), 4, Math.min(7, tileManager.getMapRows() - 2));
         ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
-        for (int i = 0; i < 5; i++) {
+
+        for (int i = 0; i < nombreAlien; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(
                     protagonistSpawnX,
                     protagonistSpawnY,
@@ -77,7 +84,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         int[][] enemySpawnZones = buildEnemySpawnZones();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < nombreEnnemi; i++) {
             int[] zone = enemySpawnZones[i % enemySpawnZones.length];
             double[] spawn = getFreeSpawnPositionInZoneFarFrom(
                     zone[0],
@@ -380,6 +387,12 @@ public class GamePanel extends JPanel implements Runnable {
             return;
         }
 
+        if (screenState == ScreenState.OPTIONS) {
+            if (handleAiOptionsClick(mouseX, mouseY)) {
+                return;
+            }
+        }
+
         if (screenState == ScreenState.GAME_OVER && getReplayButtonBounds().contains(mouseX, mouseY)) {
             initializeWorld();
             screenState = ScreenState.PLAYING;
@@ -425,6 +438,49 @@ public class GamePanel extends JPanel implements Runnable {
         int x = (panelWidth - buttonWidth) / 2;
         int y = panelHeight - 120;
         return new Rectangle(x, y, buttonWidth, buttonHeight);
+    }
+
+    private Rectangle getAiMinusButtonBounds(int rowIndex) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int x = panelWidth - 210;
+        int y = AI_OPTIONS_BASE_Y + rowIndex * AI_OPTION_ROW_GAP - 22;
+        return new Rectangle(x, y, 34, 26);
+    }
+
+    private Rectangle getAiPlusButtonBounds(int rowIndex) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int x = panelWidth - 168;
+        int y = AI_OPTIONS_BASE_Y + rowIndex * AI_OPTION_ROW_GAP - 22;
+        return new Rectangle(x, y, 34, 26);
+    }
+
+    private boolean handleAiOptionsClick(int mouseX, int mouseY) {
+        for (int i = 0; i < AI_OPTION_COUNT; i++) {
+            if (getAiMinusButtonBounds(i).contains(mouseX, mouseY)) {
+                adjustAiOption(i, -1);
+                return true;
+            }
+            if (getAiPlusButtonBounds(i).contains(mouseX, mouseY)) {
+                adjustAiOption(i, 1);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void adjustAiOption(int rowIndex, int direction) {
+        switch (rowIndex) {
+            case 0 -> AiTuning.adjustEnemyReactionFrames(direction);
+            case 1 -> AiTuning.adjustSoldierReactionFrames(direction);
+            case 2 -> AiTuning.adjustEnemyAimStabilizationFrames(direction);
+            case 3 -> AiTuning.adjustSoldierAimStabilizationFrames(direction);
+            case 4 -> AiTuning.adjustSuppressionDurationFrames(direction * 5);
+            case 5 -> AiTuning.adjustSuppressionCoverBoost(direction * 0.05);
+            case 6 -> AiTuning.adjustSuppressionNearMissRadius(direction * 4.0);
+            default -> {
+            }
+        }
     }
 
     private Rectangle getReplayButtonBounds() {
@@ -498,6 +554,30 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.setFont(oldFont);
     }
 
+    private void drawSmallButton(Graphics2D g2d, Rectangle rect, String label) {
+        g2d.setColor(new Color(30, 30, 30, 220));
+        g2d.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 8, 8);
+        g2d.setColor(new Color(235, 235, 235));
+        g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 8, 8);
+
+        Font oldFont = g2d.getFont();
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 16f));
+        FontMetrics fm = g2d.getFontMetrics();
+        int textX = rect.x + (rect.width - fm.stringWidth(label)) / 2;
+        int textY = rect.y + (rect.height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(label, textX, textY);
+        g2d.setFont(oldFont);
+    }
+
+    private void drawAiOptionRow(Graphics2D g2d, int rowIndex, String label, String value) {
+        int y = AI_OPTIONS_BASE_Y + rowIndex * AI_OPTION_ROW_GAP;
+        g2d.drawString(label, 130, y);
+        g2d.drawString(value, 470, y);
+
+        drawSmallButton(g2d, getAiMinusButtonBounds(rowIndex), "-");
+        drawSmallButton(g2d, getAiPlusButtonBounds(rowIndex), "+");
+    }
+
     private void drawMenu(Graphics2D g2d) {
         int panelWidth = getWidth() > 0 ? getWidth() : 800;
         int panelHeight = getHeight() > 0 ? getHeight() : 600;
@@ -538,9 +618,21 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, 130);
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 20f));
-        g2d.drawString("- P : mettre le jeu en pause/reprendre", 180, 220);
-        g2d.drawString("- Clic droit : envoyer le soldat", 180, 255);
-        g2d.drawString("- Clic gauche : tirer", 180, 290);
+        g2d.drawString("- P : mettre le jeu en pause/reprendre", 130, 190);
+        g2d.drawString("- Clic droit : envoyer le soldat", 130, 220);
+        g2d.drawString("- Clic gauche : tirer", 130, 250);
+
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 22f));
+        g2d.drawString("Constantes IA", 130, AI_OPTIONS_BASE_Y - 34);
+
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 18f));
+        drawAiOptionRow(g2d, 0, "Reaction ennemis (frames)", Integer.toString(AiTuning.getEnemyReactionFrames()));
+        drawAiOptionRow(g2d, 1, "Reaction soldats (frames)", Integer.toString(AiTuning.getSoldierReactionFrames()));
+        drawAiOptionRow(g2d, 2, "Visee ennemis (frames)", Integer.toString(AiTuning.getEnemyAimStabilizationFrames()));
+        drawAiOptionRow(g2d, 3, "Visee soldats (frames)", Integer.toString(AiTuning.getSoldierAimStabilizationFrames()));
+        drawAiOptionRow(g2d, 4, "Suppression duree (frames)", Integer.toString(AiTuning.getSuppressionDurationFrames()));
+        drawAiOptionRow(g2d, 5, "Suppression bonus couverture", String.format("%.2f", AiTuning.getSuppressionCoverBoost()));
+        drawAiOptionRow(g2d, 6, "Suppression rayon (px)", Integer.toString((int) Math.round(AiTuning.getSuppressionNearMissRadius())));
 
         drawButton(g2d, getBackButtonBounds(), "Retour");
         g2d.setFont(oldFont);

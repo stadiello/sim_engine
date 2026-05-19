@@ -55,7 +55,7 @@ public final class Weapon {
             "Glock",
             "/assets/armes/glock.png",
             Projectile.ProjectileType.BULLET,
-            4,
+            8,
             70,
             6,
             16,
@@ -158,6 +158,39 @@ public final class Weapon {
 
     public int getCooldownFrames() {
         return cooldownFrames;
+    }
+
+    public double getProjectileSpeed() {
+        return projectileSpeed;
+    }
+
+    public boolean isShotgun() {
+        return projectileType == Projectile.ProjectileType.SHOTGUN_PELLET;
+    }
+
+    public boolean isLongRange() {
+        return projectileSpeed >= 25.0;
+    }
+
+    public double getAiOptimalRange() {
+        if (isShotgun()) {
+            return 120.0;
+        }
+        if (isLongRange()) {
+            return 280.0;
+        }
+        if ("Glock".equals(name)) {
+            return 200.0;
+        }
+        return 220.0;
+    }
+
+    public double getAiRetreatRange() {
+        return getAiOptimalRange() * 0.60;
+    }
+
+    public double getAiEngageRange() {
+        return getAiOptimalRange() * 1.35;
     }
 
     public boolean isAutomatic() {

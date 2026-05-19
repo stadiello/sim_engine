@@ -5,6 +5,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import main.GamePanel;
+import object.ai.AiTuning;
 import world.TileManager;
 
 public class Projectile extends GameObject {
@@ -45,6 +46,8 @@ public class Projectile extends GameObject {
     }
 
     public void update() {
+        double previousX = x;
+        double previousY = y;
         x += vx;
         y += vy;
 
@@ -60,9 +63,31 @@ public class Projectile extends GameObject {
                 continue;
             }
 
-            double hx = homme.x - x;
-            double hy = homme.y - y;
-            if (hx * hx + hy * hy < 18 * 18) {
+            // if (!areHostile(tireur, homme)) {
+            //     continue;
+            // }
+
+                double distSq = distancePointToSegmentSquared(
+                    homme.x,
+                    homme.y,
+                    previousX,
+                    previousY,
+                    x,
+                    y
+                );
+            double hitRadiusSq = 18 * 18;
+            double suppressionRadius = AiTuning.getSuppressionNearMissRadius();
+            double suppressionRadiusSq = suppressionRadius * suppressionRadius;
+
+            if (distSq < suppressionRadiusSq) {
+                double dist = Math.sqrt(Math.max(0.0, distSq));
+                double intensity = 1.0 - (dist / suppressionRadius);
+                if (intensity > 0) {
+                    homme.onIncomingFire(tireur, intensity);
+                }
+            }
+
+            if (distSq < hitRadiusSq) {
                 ObjectManager.list.remove(homme);
                 homme.onDeath();
                 ObjectManager.list.add(new ImpactSpark(x, y));
@@ -100,6 +125,40 @@ public class Projectile extends GameObject {
             g2d.drawImage(projectileImage, projectileX, projectileY, projectileWidth, projectileHeight, null);
         }
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
+    }
+
+    private boolean areHostile(Homme from, Homme to) {
+        boolean fromHostileTeam = from instanceof Ennemi || from instanceof Alien;
+        boolean toHostileTeam = to instanceof Ennemi || to instanceof Alien;
+        return fromHostileTeam != toHostileTeam;
+    }
+
+    private static double distancePointToSegmentSquared(
+            double px,
+            double py,
+            double x1,
+            double y1,
+            double x2,
+            double y2
+    ) {
+        double segX = x2 - x1;
+        double segY = y2 - y1;
+        double segLenSq = segX * segX + segY * segY;
+
+        if (segLenSq <= 0.0000001) {
+            double dx = px - x1;
+            double dy = py - y1;
+            return dx * dx + dy * dy;
+        }
+
+        double t = ((px - x1) * segX + (py - y1) * segY) / segLenSq;
+        t = Math.max(0.0, Math.min(1.0, t));
+
+        double closestX = x1 + t * segX;
+        double closestY = y1 + t * segY;
+        double dx = px - closestX;
+        double dy = py - closestY;
+        return dx * dx + dy * dy;
     }
     
 }
