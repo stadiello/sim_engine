@@ -13,6 +13,7 @@ import object.Protagonist;
 import object.Soldat;
 import object.ObjectManager;
 import world.TileManager;
+import world.TileManager.MapType;
 
 public class GamePanel extends JPanel implements Runnable {
 
@@ -39,6 +40,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int AI_OPTIONS_BASE_Y = 292;
     private static final int AI_OPTION_ROW_GAP = 34;
     private static final int AI_OPTION_COUNT = 8;
+    private static final int MENU_MAP_CARD_GAP = 26;
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
@@ -375,6 +377,10 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         if (screenState == ScreenState.MENU) {
+            if (handleMapSelectionClick(mouseX, mouseY)) {
+                return;
+            }
+
             if (getFreeModeButtonBounds().contains(mouseX, mouseY)) {
                 GameMode.current = GameMode.FREE;
                 initializeWorld();
@@ -423,20 +429,55 @@ public class GamePanel extends JPanel implements Runnable {
         int panelWidth = getWidth() > 0 ? getWidth() : 800;
         int panelHeight = getHeight() > 0 ? getHeight() : 600;
         int buttonWidth = 220;
-        int buttonHeight = 52;
+        int buttonHeight = 48;
         int x = (panelWidth - buttonWidth) / 2;
-        int y = panelHeight / 2 - 60;
+        int y = panelHeight / 2 + 10;
         return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
     private Rectangle getStoryModeButtonBounds() {
         Rectangle free = getFreeModeButtonBounds();
-        return new Rectangle(free.x, free.y + 72, free.width, free.height);
+        return new Rectangle(free.x, free.y + 62, free.width, free.height);
     }
 
     private Rectangle getOptionsButtonBounds() {
         Rectangle story = getStoryModeButtonBounds();
-        return new Rectangle(story.x, story.y + 72, story.width, story.height);
+        return new Rectangle(story.x, story.y + 62, story.width, story.height);
+    }
+
+    private Rectangle getMapCardBounds(int index, int total) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int cardHeight = 130;
+        int maxCardWidth = 250;
+        int availableWidth = panelWidth - 120 - (total - 1) * MENU_MAP_CARD_GAP;
+        int cardWidth = Math.max(150, Math.min(maxCardWidth, availableWidth / total));
+        int totalWidth = total * cardWidth + (total - 1) * MENU_MAP_CARD_GAP;
+        int startX = (panelWidth - totalWidth) / 2;
+        int y = 140;
+        return new Rectangle(startX + index * (cardWidth + MENU_MAP_CARD_GAP), y, cardWidth, cardHeight);
+    }
+
+    private Rectangle getMapPreviewImageBounds(Rectangle cardBounds) {
+        int margin = 8;
+        return new Rectangle(
+                cardBounds.x + margin,
+                cardBounds.y + margin,
+                cardBounds.width - margin * 2,
+                cardBounds.height - margin * 2 - 26
+        );
+    }
+
+    private boolean handleMapSelectionClick(int mouseX, int mouseY) {
+        MapType[] mapTypes = tileManager.getAvailableMapTypes();
+        for (int i = 0; i < mapTypes.length; i++) {
+            Rectangle card = getMapCardBounds(i, mapTypes.length);
+            if (card.contains(mouseX, mouseY)) {
+                tileManager.setCurrentMapType(mapTypes[i]);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Rectangle getBackButtonBounds() {
@@ -597,19 +638,46 @@ public class GamePanel extends JPanel implements Runnable {
 
         Font oldFont = g2d.getFont();
         g2d.setColor(Color.WHITE);
-        g2d.setFont(oldFont.deriveFont(Font.BOLD, 48f));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 44f));
         String title = "SIM ENGINE";
         FontMetrics fm = g2d.getFontMetrics();
-        g2d.drawString(title, (panelWidth - fm.stringWidth(title)) / 2, panelHeight / 2 - 100);
+        g2d.drawString(title, (panelWidth - fm.stringWidth(title)) / 2, 88);
+
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 18f));
+        String mapTitle = "Choisis ta carte";
+        FontMetrics mapFm = g2d.getFontMetrics();
+        g2d.drawString(mapTitle, (panelWidth - mapFm.stringWidth(mapTitle)) / 2, 118);
+
+        MapType[] mapTypes = tileManager.getAvailableMapTypes();
+        for (int i = 0; i < mapTypes.length; i++) {
+            Rectangle card = getMapCardBounds(i, mapTypes.length);
+            Rectangle preview = getMapPreviewImageBounds(card);
+            boolean selected = mapTypes[i] == tileManager.getCurrentMapType();
+
+            g2d.setColor(new Color(24, 24, 24, 225));
+            g2d.fillRoundRect(card.x, card.y, card.width, card.height, 16, 16);
+            tileManager.drawPreview(g2d, preview, mapTypes[i]);
+
+            g2d.setColor(selected ? new Color(255, 216, 92) : new Color(225, 225, 225));
+            g2d.setStroke(new BasicStroke(selected ? 3f : 2f));
+            g2d.drawRoundRect(card.x, card.y, card.width, card.height, 16, 16);
+
+            g2d.setFont(oldFont.deriveFont(Font.BOLD, 15f));
+            FontMetrics cardFm = g2d.getFontMetrics();
+            String label = mapTypes[i].getDisplayName();
+            int labelX = card.x + (card.width - cardFm.stringWidth(label)) / 2;
+            int labelY = card.y + card.height - 7;
+            g2d.drawString(label, labelX, labelY);
+        }
 
         drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
         drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
         drawButton(g2d, getOptionsButtonBounds(), "Options");
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 16f));
-        String hint = "Clique sur un bouton pour continuer";
+        String hint = "Clique sur une carte puis sur un mode";
         FontMetrics hintFm = g2d.getFontMetrics();
-        g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight - 40);
+        g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight - 26);
         g2d.setFont(oldFont);
     }
 

@@ -170,4 +170,50 @@ public class TileGenerator {
         g.dispose();
         return img;
     }
+
+    public static BufferedImage generateSand() {
+        BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+
+        g.setColor(new Color(209, 181, 126));
+        g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+        Random rand = new Random(0);
+        g.setColor(new Color(190, 162, 110));
+        for (int i = 0; i < 35; i++) {
+            int x = rand.nextInt(TILE_SIZE);
+            int y = rand.nextInt(TILE_SIZE);
+            int w = 2 + rand.nextInt(4);
+            int h = 2 + rand.nextInt(4);
+            g.fillOval(x, y, w, h);
+        }
+
+        g.dispose();
+        return img;
+    }
+
+    public static BufferedImage generateWoodenCrate() {
+        BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+
+        g.setColor(new Color(209, 181, 126));
+        g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+        g.setColor(new Color(123, 83, 45));
+        g.fillRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
+
+        g.setColor(new Color(96, 63, 33));
+        g.setStroke(new BasicStroke(3f));
+        g.drawRect(6, 6, TILE_SIZE - 12, TILE_SIZE - 12);
+        g.drawLine(6, 6, TILE_SIZE - 6, TILE_SIZE - 6);
+        g.drawLine(TILE_SIZE - 6, 6, 6, TILE_SIZE - 6);
+
+        g.setColor(new Color(146, 99, 56));
+        g.setStroke(new BasicStroke(2f));
+        g.drawLine(8, TILE_SIZE / 2, TILE_SIZE - 8, TILE_SIZE / 2);
+        g.drawLine(TILE_SIZE / 2, 8, TILE_SIZE / 2, TILE_SIZE - 8);
+
+        g.dispose();
+        return img;
+    }
 }
