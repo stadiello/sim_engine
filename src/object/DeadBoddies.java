@@ -1,9 +1,9 @@
-package object;
+// package object;
 
-public class DeadBoddies extends GameObject {
+// public class DeadBoddies extends GameObject {
 
-    public DeadBoddies(double x, double y) {
-        super(x, y);
-    }
+//     public DeadBoddies(double x, double y) {
+//         super(x, y);
+//     }
     
-}
+// }
