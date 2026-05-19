@@ -141,15 +141,22 @@ public class TileManager {
     }
 
     public void draw(Graphics g) {
+        Rectangle clip = g.getClipBounds();
+        int viewWidth = clip != null ? clip.width : 800;
+        int viewHeight = clip != null ? clip.height : 600;
+        int margin = 1;
 
-        for (int row = 0; row < map.length; row++) {
+        int startCol = Math.max(0, getCameraX() / gp.tileSize - margin);
+        int endCol = Math.min(map[0].length - 1, (getCameraX() + viewWidth) / gp.tileSize + margin);
+        int startRow = Math.max(0, getCameraY() / gp.tileSize - margin);
+        int endRow = Math.min(map.length - 1, (getCameraY() + viewHeight) / gp.tileSize + margin);
 
-            for (int col = 0; col < map[row].length; col++) {
+        for (int row = startRow; row <= endRow; row++) {
+            for (int col = startCol; col <= endCol; col++) {
                 int tileId = map[row][col];
                 int x = col * gp.tileSize;
                 int y = row * gp.tileSize;
                 g.drawImage(tiles[tileId].image, x, y, gp.tileSize, gp.tileSize, null);
-
             }
         }
     }

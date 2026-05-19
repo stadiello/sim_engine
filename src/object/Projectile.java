@@ -54,19 +54,21 @@ public class Projectile extends GameObject {
             return;
         }
 
-        // Vérification des collisions avec les hommes (ignorer le tireur lui-même)
-        for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {
-            if (obj instanceof Homme homme && homme != tireur) {
-                double hx = homme.x - x;
-                double hy = homme.y - y;
-                if (hx * hx + hy * hy < 18 * 18) {
-                    ObjectManager.list.remove(homme);
-                    homme.onDeath();
-                    ObjectManager.list.add(new ImpactSpark(x, y));
-                    ObjectManager.list.remove(this);
-                    GamePanel.score += 10;
-                    return;
-                }
+        // Vérification des collisions sans recopier toute la liste globale à chaque projectile.
+        for (Homme homme : ObjectManager.getLivingHumans()) {
+            if (homme == tireur) {
+                continue;
+            }
+
+            double hx = homme.x - x;
+            double hy = homme.y - y;
+            if (hx * hx + hy * hy < 18 * 18) {
+                ObjectManager.list.remove(homme);
+                homme.onDeath();
+                ObjectManager.list.add(new ImpactSpark(x, y));
+                ObjectManager.list.remove(this);
+                GamePanel.score += 10;
+                return;
             }
         }
 
