@@ -101,6 +101,10 @@ public final class Weapon {
         return new Weapon[]{blaster(), carabine(), glock(), shotgun()};
     }
 
+    public static Weapon[] storyLoadout() {
+        return new Weapon[]{glock()};
+    }
+
     private final String name;
     private final Image sprite;
     private final Projectile.ProjectileType projectileType;
@@ -142,6 +146,14 @@ public final class Weapon {
         this.automatic = automatic;
         this.ejectShell = ejectShell;
         this.fireSound = fireSound;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public Image getSprite() {
+        return sprite;
     }
 
     public int getCooldownFrames() {

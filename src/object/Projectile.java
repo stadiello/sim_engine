@@ -61,6 +61,7 @@ public class Projectile extends GameObject {
                 double hy = homme.y - y;
                 if (hx * hx + hy * hy < 18 * 18) {
                     ObjectManager.list.remove(homme);
+                    homme.onDeath();
                     ObjectManager.list.add(new ImpactSpark(x, y));
                     ObjectManager.list.remove(this);
                     GamePanel.score += 10;

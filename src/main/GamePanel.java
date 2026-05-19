@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.KeyboardFocusManager;
 
 import gameController.GameKeyController;
+import main.GameMode;
 import object.Alien;
 import object.Ennemi;
 import object.GameObject;
@@ -320,7 +321,14 @@ public class GamePanel extends JPanel implements Runnable {
         int mouseY = keyController.getMouseY();
 
         if (screenState == ScreenState.MENU) {
-            if (getPlayButtonBounds().contains(mouseX, mouseY)) {
+            if (getFreeModeButtonBounds().contains(mouseX, mouseY)) {
+                GameMode.current = GameMode.FREE;
+                initializeWorld();
+                screenState = ScreenState.PLAYING;
+                paused = false;
+            } else if (getStoryModeButtonBounds().contains(mouseX, mouseY)) {
+                GameMode.current = GameMode.STORY;
+                initializeWorld();
                 screenState = ScreenState.PLAYING;
                 paused = false;
             } else if (getOptionsButtonBounds().contains(mouseX, mouseY)) {
@@ -341,19 +349,24 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
-    private Rectangle getPlayButtonBounds() {
+    private Rectangle getFreeModeButtonBounds() {
         int panelWidth = getWidth() > 0 ? getWidth() : 800;
         int panelHeight = getHeight() > 0 ? getHeight() : 600;
         int buttonWidth = 220;
         int buttonHeight = 52;
         int x = (panelWidth - buttonWidth) / 2;
-        int y = panelHeight / 2 - 40;
+        int y = panelHeight / 2 - 60;
         return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
+    private Rectangle getStoryModeButtonBounds() {
+        Rectangle free = getFreeModeButtonBounds();
+        return new Rectangle(free.x, free.y + 72, free.width, free.height);
+    }
+
     private Rectangle getOptionsButtonBounds() {
-        Rectangle play = getPlayButtonBounds();
-        return new Rectangle(play.x, play.y + 72, play.width, play.height);
+        Rectangle story = getStoryModeButtonBounds();
+        return new Rectangle(story.x, story.y + 72, story.width, story.height);
     }
 
     private Rectangle getBackButtonBounds() {
@@ -470,7 +483,8 @@ public class GamePanel extends JPanel implements Runnable {
         FontMetrics fm = g2d.getFontMetrics();
         g2d.drawString(title, (panelWidth - fm.stringWidth(title)) / 2, panelHeight / 2 - 100);
 
-        drawButton(g2d, getPlayButtonBounds(), "Play");
+        drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
+        drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
         drawButton(g2d, getOptionsButtonBounds(), "Options");
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 16f));

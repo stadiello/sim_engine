@@ -17,6 +17,8 @@ public abstract class GameObject {
     public abstract void update();
     public abstract void draw(Graphics g);
 
+    public void onDeath() {}
+
     protected boolean canMoveTo(double nextX, double nextY, double radius) {
         TileManager tileManager = ObjectManager.getTileManager();
         if (tileManager == null) {

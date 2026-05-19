@@ -7,6 +7,8 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import object.ai.BotBrain;
+import object.weapon.Weapon;
+import main.GameMode;
 
 public class Ennemi extends Homme {
 
@@ -26,6 +28,7 @@ public class Ennemi extends Homme {
     }
 
     private final BotBrain brain;
+    private final Weapon carriedWeapon;
     private double facingX = 0;
     private double facingY = -1;
     private int shotAnimTimer = 0;
@@ -33,8 +36,23 @@ public class Ennemi extends Homme {
     public Ennemi(double x, double y) {
         super(x, y);
         this.brain = new BotBrain();
+        this.carriedWeapon = pickRandomWeapon();
         this.vx = 0;
         this.vy = 0;
+    }
+
+    private static Weapon pickRandomWeapon() {
+        double r = Math.random();
+        if (r < 0.50) return Weapon.glock();
+        if (r < 0.80) return Weapon.carabine();
+        return Weapon.shotgun();
+    }
+
+    @Override
+    public void onDeath() {
+        if (GameMode.current == GameMode.STORY) {
+            ObjectManager.list.add(new DroppedWeapon(x, y, carriedWeapon));
+        }
     }
 
     @Override

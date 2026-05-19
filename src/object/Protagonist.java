@@ -5,13 +5,15 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import gameController.*;
+import main.GameMode;
 import object.weapon.Weapon;
 import world.TileManager;
+import java.util.ArrayList;
 
 public class Protagonist extends Homme{
 
     private static Image imgCorps;
-    private static final Weapon[] LOADOUT = Weapon.protagonistLoadout();
+    private final ArrayList<Weapon> loadout;
     private boolean shot = false;
 
     private static final double MOVE_SPEED = 2.6;
@@ -34,10 +36,30 @@ public class Protagonist extends Homme{
     public Protagonist(double x, double y, GameKeyController keyController) {
         super(x, y);
         this.keyController = keyController;
+        Weapon[] initial = GameMode.current == GameMode.STORY
+                ? Weapon.storyLoadout()
+                : Weapon.protagonistLoadout();
+        this.loadout = new ArrayList<>();
+        for (Weapon w : initial) {
+            loadout.add(w);
+        }
         vx = 0;
         vy = 0;
         facingX = 0;
         facingY = -1;
+    }
+
+    /** Ajoute une arme au loadout si elle n'est pas déjà présente. Retourne true si ajoutée. */
+    public boolean addWeapon(Weapon weapon) {
+        if (loadout.contains(weapon)) {
+            return false;
+        }
+        loadout.add(weapon);
+        return true;
+    }
+
+    public boolean hasWeapon(Weapon weapon) {
+        return loadout.contains(weapon);
     }
 
     @Override
@@ -59,8 +81,8 @@ public class Protagonist extends Homme{
         }
 
         int weaponScrollDelta = keyController.consumeWeaponScrollDelta();
-        if (weaponScrollDelta != 0 && LOADOUT.length > 0) {
-            selectedWeaponIndex = Math.floorMod(selectedWeaponIndex + weaponScrollDelta, LOADOUT.length);
+        if (weaponScrollDelta != 0 && loadout.size() > 0) {
+            selectedWeaponIndex = Math.floorMod(selectedWeaponIndex + weaponScrollDelta, loadout.size());
         }
 
         if (shootCooldown > 0) {
@@ -71,7 +93,7 @@ public class Protagonist extends Homme{
         if (keyController.isRight()) inputX += 1;
         if (keyController.isUp()) inputY -= 1;
         if (keyController.isDown()) inputY += 1;
-        Weapon currentWeapon = LOADOUT.length > 0 ? LOADOUT[selectedWeaponIndex] : null;
+        Weapon currentWeapon = loadout.size() > 0 ? loadout.get(Math.min(selectedWeaponIndex, loadout.size() - 1)) : null;
         boolean leftClickTriggered = keyController.consumeLeftClickPressed();
         boolean shouldFire = currentWeapon != null
                 && shootCooldown == 0
@@ -105,7 +127,7 @@ public class Protagonist extends Homme{
         
         double drawVx = facingX;
         double drawVy = facingY;
-        Weapon currentWeapon = LOADOUT.length > 0 ? LOADOUT[selectedWeaponIndex] : null;
+        Weapon currentWeapon = loadout.size() > 0 ? loadout.get(Math.min(selectedWeaponIndex, loadout.size() - 1)) : null;
 
         double angle = Math.atan2(drawVy, drawVx) + Math.PI / 2;
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
