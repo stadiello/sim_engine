@@ -16,6 +16,7 @@ public class Utils {
 	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10, 12_000_000L);
 	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5, 20_000_000L);
 	private static final SoundPool SHOTGUN_POOL = new SoundPool("/sound/shotGun.wav", 3, 45_000_000L);
+	private static final SoundPool GRENADE_POOL = new SoundPool("/sound/explosion.wav", 2, 30_000_000L);
 	private static final ExecutorService AUDIO_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
 		Thread thread = new Thread(runnable, "sim-engine-audio");
 		thread.setDaemon(true);
@@ -34,6 +35,10 @@ public class Utils {
 
 	public static void playPistolSound() {
 		dispatch(PISTOL_POOL);
+	}
+
+	public static void playGrenadeSound() {
+		dispatch(GRENADE_POOL);
 	}
 
 	public static void playShotgunSound() {

@@ -5,12 +5,20 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import main.GamePanel;
+import main.Utils;
 import object.ai.AiTuning;
 import world.TileManager;
 
 public class Projectile extends GameObject {
 
     private static final double ENEMY_SUPPRESSION_MULTIPLIER = 0.30;
+    private static final double GRENADE_BOUNCE_FACTOR = 0.58;
+    private static final double GRENADE_FRICTION_FACTOR = 0.97;
+    private static final double GRENADE_STOP_SPEED_SQ = 0.12;
+    private static final double GRENADE_RADIUS = 7.0;
+    private static final double GRENADE_BLAST_RADIUS = 72.0;
+    private static final int GRENADE_FUSE_FRAMES = 180;
+    private static final int GRENADE_SPARK_COUNT = 3;
 
     private static Image imgShot;
     private static Image imgBullet;
@@ -19,7 +27,8 @@ public class Projectile extends GameObject {
     public enum ProjectileType {
         DEFAULT,
         BULLET,
-        SHOTGUN_PELLET
+        SHOTGUN_PELLET,
+        GRENADE
     }
 
     static {
@@ -37,6 +46,7 @@ public class Projectile extends GameObject {
     private int vie = 120; // Durée de vie du projectile en frames
     private final Homme tireur; // Le tireur à ignorer lors des collisions
     private final ProjectileType type;
+    private int fuseFrames = GRENADE_FUSE_FRAMES;
 
     public Projectile(double x, double y, double vx, double vy, Homme tireur, ProjectileType type) {
         super(x, y);
@@ -48,6 +58,11 @@ public class Projectile extends GameObject {
     }
 
     public void update() {
+        if (type == ProjectileType.GRENADE) {
+            updateGrenade();
+            return;
+        }
+
         double previousX = x;
         double previousY = y;
         x += vx;
@@ -114,8 +129,74 @@ public class Projectile extends GameObject {
         }
     }
 
+    private void updateGrenade() {
+        boolean bounced = false;
+
+        double nextX = x + vx;
+        if (canMoveTo(nextX, y, GRENADE_RADIUS)) {
+            x = nextX;
+        } else {
+            vx = -vx * GRENADE_BOUNCE_FACTOR;
+            bounced = true;
+        }
+
+        double nextY = y + vy;
+        if (canMoveTo(x, nextY, GRENADE_RADIUS)) {
+            y = nextY;
+        } else {
+            vy = -vy * GRENADE_BOUNCE_FACTOR;
+            bounced = true;
+        }
+
+        double friction = bounced ? 0.92 : GRENADE_FRICTION_FACTOR;
+        vx *= friction;
+        vy *= friction;
+
+        if (vx * vx + vy * vy < GRENADE_STOP_SPEED_SQ) {
+            vx = 0;
+            vy = 0;
+        }
+
+        angle += (vx + vy) * 0.03;
+        fuseFrames--;
+
+        TileManager tileManager = ObjectManager.getTileManager();
+        double maxX = tileManager != null ? tileManager.getWorldWidth() : 800;
+        double maxY = tileManager != null ? tileManager.getWorldHeight() : 600;
+
+        if (fuseFrames <= 0 || x < 0 || x > maxX || y < 0 || y > maxY) {
+            explode();
+            return;
+        }
+    }
+
+    private void explode() {
+        Utils.playGrenadeSound();
+
+        for (int i = 0; i < GRENADE_SPARK_COUNT; i++) {
+            ObjectManager.list.add(new ImpactSpark(x, y));
+        }
+
+        ObjectManager.list.add(new Shockwave(x, y, tireur, GRENADE_BLAST_RADIUS));
+
+        ObjectManager.list.remove(this);
+    }
+
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
+        if (type == ProjectileType.GRENADE) {
+            var old = g2d.getTransform();
+            g2d.rotate(angle, x, y);
+            g2d.setColor(new Color(78, 96, 52));
+            g2d.fillOval((int) Math.round(x - GRENADE_RADIUS), (int) Math.round(y - GRENADE_RADIUS), 14, 14);
+            g2d.setColor(new Color(22, 28, 18));
+            g2d.drawOval((int) Math.round(x - GRENADE_RADIUS), (int) Math.round(y - GRENADE_RADIUS), 14, 14);
+            g2d.setColor(new Color(180, 200, 120));
+            g2d.drawLine((int) Math.round(x), (int) Math.round(y - 6), (int) Math.round(x + 3), (int) Math.round(y - 12));
+            g2d.setTransform(old);
+            return;
+        }
+
         boolean isBullet = type == ProjectileType.BULLET;
         boolean isPellet = type == ProjectileType.SHOTGUN_PELLET;
         

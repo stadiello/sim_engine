@@ -18,6 +18,7 @@ public final class Weapon {
         SMG,
         PISTOL,
         SHOTGUN,
+        GRENADE,
         NONE
     }
 
@@ -81,6 +82,21 @@ public final class Weapon {
             true,
             FireSound.SHOTGUN);
 
+    private static final Weapon GRENADE = new Weapon(
+            "Grenade",
+            "/assets/armes/grenade.png",
+            Projectile.ProjectileType.GRENADE,
+            45,
+            11,
+            10,
+            10,
+            4,
+            -12,
+            0,
+            false,
+            false,
+            FireSound.NONE);
+
     public static Weapon blaster() {
         return BLASTER;
     }
@@ -97,8 +113,12 @@ public final class Weapon {
         return SHOTGUN;
     }
 
+    public static Weapon grenade() {
+        return GRENADE;
+    }
+
     public static Weapon[] protagonistLoadout() {
-        return new Weapon[]{blaster(), carabine(), glock(), shotgun()};
+        return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade()};
     }
 
     public static Weapon[] storyLoadout() {
@@ -250,6 +270,7 @@ public final class Weapon {
             case SMG -> Utils.playSmgSound();
             case PISTOL -> Utils.playPistolSound();
             case SHOTGUN -> Utils.playShotgunSound();
+            case GRENADE -> Utils.playGrenadeSound();
             case NONE -> {
             }
         }
