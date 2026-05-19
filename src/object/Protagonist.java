@@ -6,13 +6,19 @@ import javax.imageio.ImageIO;
 
 import gameController.*;
 import main.GameMode;
+import object.ai.TacticalMovement;
 import object.weapon.Weapon;
 import world.TileManager;
 import java.util.ArrayList;
 
 public class Protagonist extends Homme{
 
+    // private static final double WALK_CYCLE_SPEED = 0.42;
+    // private static final double WALK_BLEND_RATE = 0.18;
+
     private static Image imgCorps;
+    // private static Image imgPied_d;
+    // private static Image imgPied_g;
     private final ArrayList<Weapon> loadout;
     private boolean shot = false;
 
@@ -24,10 +30,14 @@ public class Protagonist extends Homme{
     private double facingX;
     private double facingY;
     private int selectedWeaponIndex = 0;
+    // private double walkCycle = 0;
+    // private double walkBlend = 0;
 
     static {
         try {
             imgCorps = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/corps.png"));
+            // imgPied_d = ImageIO.read(Soldat.class.getResourceAsStream("/assets/civils/pied_d.png"));
+            // imgPied_g = ImageIO.read(Soldat.class.getResourceAsStream("/assets/civils/pied_g.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -63,9 +73,86 @@ public class Protagonist extends Homme{
     }
 
     @Override
+    protected boolean canOccupyHumanSpace(double nextX, double nextY, double radius) {
+        ArrayList<Homme> overlappingHumans = ObjectManager.getOverlappingHumans(nextX, nextY, radius, this);
+        if (overlappingHumans.isEmpty()) {
+            return true;
+        }
+
+        double minSeparation = radius + getCollisionRadius() + 0.5;
+        double moveDx = nextX - x;
+        double moveDy = nextY - y;
+        double moveLenSq = moveDx * moveDx + moveDy * moveDy;
+        if (moveLenSq <= 0.0000001) {
+            return false;
+        }
+
+        double moveLen = Math.sqrt(moveLenSq);
+        double fallbackDirX = moveDx / moveLen;
+        double fallbackDirY = moveDy / moveLen;
+
+        GameObject[] ignoredObjects = new GameObject[overlappingHumans.size() + 1];
+        ignoredObjects[0] = this;
+        for (int i = 0; i < overlappingHumans.size(); i++) {
+            ignoredObjects[i + 1] = overlappingHumans.get(i);
+        }
+
+        ArrayList<double[]> candidatePositions = new ArrayList<>(overlappingHumans.size());
+        for (Homme other : overlappingHumans) {
+            double awayX = other.x - nextX;
+            double awayY = other.y - nextY;
+            double awayLenSq = awayX * awayX + awayY * awayY;
+
+            double dirX;
+            double dirY;
+            if (awayLenSq <= 0.0000001) {
+                dirX = fallbackDirX;
+                dirY = fallbackDirY;
+            } else {
+                double awayLen = Math.sqrt(awayLenSq);
+                dirX = awayX / awayLen;
+                dirY = awayY / awayLen;
+            }
+
+            double candidateX = nextX + dirX * minSeparation;
+            double candidateY = nextY + dirY * minSeparation;
+
+            if (!TacticalMovement.canStandAt(candidateX, candidateY, other.getCollisionRadius())
+                    || !ObjectManager.isHumanAreaFree(candidateX, candidateY, other.getCollisionRadius(), ignoredObjects)) {
+                return false;
+            }
+
+            candidatePositions.add(new double[]{candidateX, candidateY});
+        }
+
+        for (int i = 0; i < candidatePositions.size(); i++) {
+            double[] first = candidatePositions.get(i);
+            for (int j = i + 1; j < candidatePositions.size(); j++) {
+                double[] second = candidatePositions.get(j);
+                double dx = first[0] - second[0];
+                double dy = first[1] - second[1];
+                if (dx * dx + dy * dy < minSeparation * minSeparation) {
+                    return false;
+                }
+            }
+        }
+
+        for (int i = 0; i < overlappingHumans.size(); i++) {
+            Homme other = overlappingHumans.get(i);
+            double[] candidate = candidatePositions.get(i);
+            other.x = candidate[0];
+            other.y = candidate[1];
+        }
+
+        return true;
+    }
+
+    @Override
     public void update() {
         double inputX = 0;
         double inputY = 0;
+        double startX = x;
+        double startY = y;
 
         TileManager tileManager = ObjectManager.getTileManager();
         int cameraX = tileManager != null ? tileManager.getCameraX() : 0;
@@ -117,6 +204,14 @@ public class Protagonist extends Homme{
         }
 
         moveWithTileCollision(14);
+
+        // double movedDistance = Math.hypot(x - startX, y - startY);
+        // double targetWalkBlend = Math.min(1.0, movedDistance / MOVE_SPEED);
+        // walkBlend += (targetWalkBlend - walkBlend) * WALK_BLEND_RATE;
+        // if (movedDistance > 0.001) {
+        //     walkCycle += movedDistance * WALK_CYCLE_SPEED;
+        // }
+
         timer++;
 
     }
@@ -132,9 +227,24 @@ public class Protagonist extends Homme{
         double angle = Math.atan2(drawVy, drawVx) + Math.PI / 2;
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
 
+        // double stride = Math.sin(walkCycle);
+        // double bounce = Math.cos(walkCycle);
+        // int bodyBob = (int) Math.round(Math.abs(stride) * 2.0 * walkBlend);
+        // int footSpreadOffset = (int) Math.round(bounce * 1.5 * walkBlend);
+        // int rightFootForward = (int) Math.round(stride * 5.5 * walkBlend);
+        // int leftFootForward = (int) Math.round(-stride * 5.5 * walkBlend);
+        // int rightFootLift = (int) Math.round(Math.max(0.0, -bounce) * 3.0 * walkBlend);
+        // int leftFootLift = (int) Math.round(Math.max(0.0, bounce) * 3.0 * walkBlend);
+
         g2d.rotate(angle, x, y);
-        g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
         
+        // g2d.drawImage(imgPied_d, (int) x +5 - footSpreadOffset, (int) y-6  - rightFootForward - rightFootLift + bodyBob, 7, 15, null);
+        // g2d.drawImage(imgPied_g, (int) x -5 + footSpreadOffset, (int) y-6 - leftFootForward - leftFootLift + bodyBob, 7, 15, null);
+        // g2d.drawImage(imgCorps, (int) x - 16, (int) y - 16 - bodyBob, 32, 42, null);
+        
+        g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
+
+
         // gérer le recule de l'arme lors du tir
         if (currentWeapon != null) {
             currentWeapon.draw(g2d, x, y, timer, shot);

@@ -31,6 +31,74 @@ public class ObjectManager {
         return tileManager;
     }
 
+    public static boolean isHumanAreaFree(double x, double y, double radius, GameObject... ignoredObjects) {
+        synchronized (LOCK) {
+            for (GameObject obj : list) {
+                if (pendingRemovalSet.contains(obj)) {
+                    continue;
+                }
+
+                if (isIgnoredObject(obj, ignoredObjects)) {
+                    continue;
+                }
+
+                if (!(obj instanceof Homme homme)) {
+                    continue;
+                }
+
+                double otherRadius = homme.getCollisionRadius();
+                double allowedDistance = radius + otherRadius;
+                double dx = homme.x - x;
+                double dy = homme.y - y;
+                if (dx * dx + dy * dy < allowedDistance * allowedDistance) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    public static ArrayList<Homme> getOverlappingHumans(double x, double y, double radius, GameObject... ignoredObjects) {
+        synchronized (LOCK) {
+            ArrayList<Homme> overlapping = new ArrayList<>();
+
+            for (GameObject obj : list) {
+                if (pendingRemovalSet.contains(obj) || isIgnoredObject(obj, ignoredObjects)) {
+                    continue;
+                }
+
+                if (!(obj instanceof Homme homme)) {
+                    continue;
+                }
+
+                double otherRadius = homme.getCollisionRadius();
+                double allowedDistance = radius + otherRadius;
+                double dx = homme.x - x;
+                double dy = homme.y - y;
+                if (dx * dx + dy * dy < allowedDistance * allowedDistance) {
+                    overlapping.add(homme);
+                }
+            }
+
+            return overlapping;
+        }
+    }
+
+    private static boolean isIgnoredObject(GameObject obj, GameObject... ignoredObjects) {
+        if (ignoredObjects == null) {
+            return false;
+        }
+
+        for (GameObject ignoredObject : ignoredObjects) {
+            if (obj == ignoredObject) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static Soldat getSoldat() {
         synchronized (LOCK) {
             for (GameObject obj : list) {

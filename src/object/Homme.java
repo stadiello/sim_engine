@@ -8,6 +8,8 @@ import object.ai.AiTuning;
 
 public class Homme extends GameObject {
 
+    private static final double COLLISION_RADIUS = 14.0;
+
     private static Image imgCorps;
     private static Image imgBrasD;
     private static Image imgBrasG;
@@ -29,6 +31,16 @@ public class Homme extends GameObject {
         super(x, y);
         vx = (Math.random() - 0.5) * 2;
         vy = (Math.random() - 0.5) * 2;
+    }
+
+    @Override
+    protected boolean canMoveTo(double nextX, double nextY, double radius) {
+        return super.canMoveTo(nextX, nextY, radius)
+                && canOccupyHumanSpace(nextX, nextY, Math.max(radius, COLLISION_RADIUS));
+    }
+
+    protected boolean canOccupyHumanSpace(double nextX, double nextY, double radius) {
+        return ObjectManager.isHumanAreaFree(nextX, nextY, radius, this);
     }
 
     public void update() {
@@ -75,6 +87,10 @@ public class Homme extends GameObject {
         g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 32, null);
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
         
+    }
+
+    protected double getCollisionRadius() {
+        return COLLISION_RADIUS;
     }
 
 }

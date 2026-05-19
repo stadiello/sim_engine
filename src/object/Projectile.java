@@ -10,6 +10,8 @@ import world.TileManager;
 
 public class Projectile extends GameObject {
 
+    private static final double ENEMY_SUPPRESSION_MULTIPLIER = 0.35;
+
     private static Image imgShot;
     private static Image imgBullet;
     private static Image imgShotgunPellet;
@@ -63,25 +65,23 @@ public class Projectile extends GameObject {
                 continue;
             }
 
-            // if (!areHostile(tireur, homme)) {
-            //     continue;
-            // }
+            boolean hostile = areHostile(tireur, homme);
 
-                double distSq = distancePointToSegmentSquared(
-                    homme.x,
-                    homme.y,
-                    previousX,
-                    previousY,
-                    x,
-                    y
-                );
+            double distSq = distancePointToSegmentSquared(
+                homme.x,
+                homme.y,
+                previousX,
+                previousY,
+                x,
+                y
+            );
             double hitRadiusSq = 18 * 18;
             double suppressionRadius = AiTuning.getSuppressionNearMissRadius();
             double suppressionRadiusSq = suppressionRadius * suppressionRadius;
 
-            if (distSq < suppressionRadiusSq) {
+            if (hostile && distSq < suppressionRadiusSq) {
                 double dist = Math.sqrt(Math.max(0.0, distSq));
-                double intensity = 1.0 - (dist / suppressionRadius);
+                double intensity = (1.0 - (dist / suppressionRadius)) * getSuppressionMultiplier();
                 if (intensity > 0) {
                     homme.onIncomingFire(tireur, intensity);
                 }
@@ -131,6 +131,10 @@ public class Projectile extends GameObject {
         boolean fromHostileTeam = from instanceof Ennemi || from instanceof Alien;
         boolean toHostileTeam = to instanceof Ennemi || to instanceof Alien;
         return fromHostileTeam != toHostileTeam;
+    }
+
+    private double getSuppressionMultiplier() {
+        return tireur instanceof Ennemi ? ENEMY_SUPPRESSION_MULTIPLIER : 1.0;
     }
 
     private static double distancePointToSegmentSquared(

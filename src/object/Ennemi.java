@@ -127,7 +127,7 @@ public class Ennemi extends Homme {
         var old = g2d.getTransform();
 
         g2d.rotate(angle, x, y);
-        g2d.drawImage(imgEnnemi, (int) x - 16, (int) y - 16, 32, 32, null);
+        g2d.drawImage(imgEnnemi, (int) x - 16, (int) y - 16, 32, 42, null);
         carriedWeapon.draw(g2d, x, y, shotAnimTimer, shotAnimTimer > 0);
         g2d.setTransform(old);
     }

@@ -29,6 +29,7 @@ public class GamePanel extends JPanel implements Runnable {
     private int nombreCivil = 5;
     private int nombreEnnemi = 10;
     private int nombreAlien = 5;
+    private int nombreSoldat = 1;
 
     // 50 correspond aux dimensions de la carte (800÷16=50, 600÷12=50), ce qui permet un affichage correct des tiles sur l'écran 800×600.
     public int tileSize = 50;
@@ -37,7 +38,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final double SAFE_HOSTILE_SPAWN_DISTANCE = 520;
     private static final int AI_OPTIONS_BASE_Y = 292;
     private static final int AI_OPTION_ROW_GAP = 34;
-    private static final int AI_OPTION_COUNT = 7;
+    private static final int AI_OPTION_COUNT = 8;
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
@@ -70,9 +71,16 @@ public class GamePanel extends JPanel implements Runnable {
         double protagonistSpawnY = protagonistSpawn[1];
         ObjectManager.list.add(new Protagonist(protagonistSpawn[0], protagonistSpawn[1], keyController));
 
-        // Garde un soldat allié près du protagoniste mais dans la même zone sécurisée.
-        double[] soldatSpawn = getFreeSpawnPositionInZone(5, Math.min(8, tileManager.getMapCols() - 2), 4, Math.min(7, tileManager.getMapRows() - 2));
-        ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
+        // Garde les soldats alliés près du protagoniste dans la même zone sécurisée.
+        for (int i = 0; i < nombreSoldat; i++) {
+            double[] soldatSpawn = getFreeSpawnPositionInZone(
+                5,
+                Math.min(8, tileManager.getMapCols() - 2),
+                4,
+                Math.min(7, tileManager.getMapRows() - 2)
+            );
+            ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
+        }
 
         for (int i = 0; i < nombreAlien; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(
@@ -275,7 +283,8 @@ public class GamePanel extends JPanel implements Runnable {
         return !tileManager.isBlockedAtPixel(x - radius, y - radius)
                 && !tileManager.isBlockedAtPixel(x + radius, y - radius)
                 && !tileManager.isBlockedAtPixel(x - radius, y + radius)
-                && !tileManager.isBlockedAtPixel(x + radius, y + radius);
+                && !tileManager.isBlockedAtPixel(x + radius, y + radius)
+                && ObjectManager.isHumanAreaFree(x, y, radius);
     }
 
     public static void main(String[] args) {
@@ -471,13 +480,14 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void adjustAiOption(int rowIndex, int direction) {
         switch (rowIndex) {
-            case 0 -> AiTuning.adjustEnemyReactionFrames(direction);
-            case 1 -> AiTuning.adjustSoldierReactionFrames(direction);
-            case 2 -> AiTuning.adjustEnemyAimStabilizationFrames(direction);
-            case 3 -> AiTuning.adjustSoldierAimStabilizationFrames(direction);
-            case 4 -> AiTuning.adjustSuppressionDurationFrames(direction * 5);
-            case 5 -> AiTuning.adjustSuppressionCoverBoost(direction * 0.05);
-            case 6 -> AiTuning.adjustSuppressionNearMissRadius(direction * 4.0);
+            case 0 -> nombreSoldat = Math.max(0, Math.min(10, nombreSoldat + direction));
+            case 1 -> AiTuning.adjustEnemyReactionFrames(direction);
+            case 2 -> AiTuning.adjustSoldierReactionFrames(direction);
+            case 3 -> AiTuning.adjustEnemyAimStabilizationFrames(direction);
+            case 4 -> AiTuning.adjustSoldierAimStabilizationFrames(direction);
+            case 5 -> AiTuning.adjustSuppressionDurationFrames(direction * 5);
+            case 6 -> AiTuning.adjustSuppressionCoverBoost(direction * 0.05);
+            case 7 -> AiTuning.adjustSuppressionNearMissRadius(direction * 4.0);
             default -> {
             }
         }
@@ -623,16 +633,17 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawString("- Clic gauche : tirer", 130, 250);
 
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 22f));
-        g2d.drawString("Constantes IA", 130, AI_OPTIONS_BASE_Y - 34);
+        g2d.drawString("Options de partie et IA", 130, AI_OPTIONS_BASE_Y - 34);
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 18f));
-        drawAiOptionRow(g2d, 0, "Reaction ennemis (frames)", Integer.toString(AiTuning.getEnemyReactionFrames()));
-        drawAiOptionRow(g2d, 1, "Reaction soldats (frames)", Integer.toString(AiTuning.getSoldierReactionFrames()));
-        drawAiOptionRow(g2d, 2, "Visee ennemis (frames)", Integer.toString(AiTuning.getEnemyAimStabilizationFrames()));
-        drawAiOptionRow(g2d, 3, "Visee soldats (frames)", Integer.toString(AiTuning.getSoldierAimStabilizationFrames()));
-        drawAiOptionRow(g2d, 4, "Suppression duree (frames)", Integer.toString(AiTuning.getSuppressionDurationFrames()));
-        drawAiOptionRow(g2d, 5, "Suppression bonus couverture", String.format("%.2f", AiTuning.getSuppressionCoverBoost()));
-        drawAiOptionRow(g2d, 6, "Suppression rayon (px)", Integer.toString((int) Math.round(AiTuning.getSuppressionNearMissRadius())));
+        drawAiOptionRow(g2d, 0, "Soldats allies", Integer.toString(nombreSoldat));
+        drawAiOptionRow(g2d, 1, "Reaction ennemis (frames)", Integer.toString(AiTuning.getEnemyReactionFrames()));
+        drawAiOptionRow(g2d, 2, "Reaction soldats (frames)", Integer.toString(AiTuning.getSoldierReactionFrames()));
+        drawAiOptionRow(g2d, 3, "Visee ennemis (frames)", Integer.toString(AiTuning.getEnemyAimStabilizationFrames()));
+        drawAiOptionRow(g2d, 4, "Visee soldats (frames)", Integer.toString(AiTuning.getSoldierAimStabilizationFrames()));
+        drawAiOptionRow(g2d, 5, "Suppression duree (frames)", Integer.toString(AiTuning.getSuppressionDurationFrames()));
+        drawAiOptionRow(g2d, 6, "Suppression bonus couverture", String.format("%.2f", AiTuning.getSuppressionCoverBoost()));
+        drawAiOptionRow(g2d, 7, "Suppression rayon (px)", Integer.toString((int) Math.round(AiTuning.getSuppressionNearMissRadius())));
 
         drawButton(g2d, getBackButtonBounds(), "Retour");
         g2d.setFont(oldFont);
