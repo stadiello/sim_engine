@@ -160,25 +160,30 @@ public class ObjectManager {
     }
 
     public static void drawAll(Graphics g) {
+        ArrayList<GameObject> snapshot;
+        HashSet<GameObject> removedSnapshot;
         synchronized (LOCK) {
-            // Dessine d'abord les douilles pour qu'elles restent sous les personnages.
-            for (GameObject obj : list) {
-                if (pendingRemovalSet.contains(obj)) {
-                    continue;
-                }
-                if (obj instanceof Douille) {
-                    obj.draw(g);
-                }
-            }
+            snapshot = new ArrayList<>(list);
+            removedSnapshot = new HashSet<>(pendingRemovalSet);
+        }
 
-            // Dessine ensuite tout le reste.
-            for (GameObject obj : list) {
-                if (pendingRemovalSet.contains(obj)) {
-                    continue;
-                }
-                if (!(obj instanceof Douille)) {
-                    obj.draw(g);
-                }
+        // Dessine d'abord les douilles pour qu'elles restent sous les personnages.
+        for (GameObject obj : snapshot) {
+            if (removedSnapshot.contains(obj)) {
+                continue;
+            }
+            if (obj instanceof Douille) {
+                obj.draw(g);
+            }
+        }
+
+        // Dessine ensuite tout le reste.
+        for (GameObject obj : snapshot) {
+            if (removedSnapshot.contains(obj)) {
+                continue;
+            }
+            if (!(obj instanceof Douille)) {
+                obj.draw(g);
             }
         }
     }

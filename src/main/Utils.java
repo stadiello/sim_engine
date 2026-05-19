@@ -3,6 +3,9 @@ package main;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
@@ -13,23 +16,36 @@ public class Utils {
 	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10, 12_000_000L);
 	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5, 20_000_000L);
 	private static final SoundPool SHOTGUN_POOL = new SoundPool("/sound/shotGun.wav", 3, 45_000_000L);
+	private static final ExecutorService AUDIO_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "sim-engine-audio");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	private Utils() {}
 
 	public static void playLaserSound() {
-		LASER_POOL.play();
+		dispatch(LASER_POOL);
 	}
 
 	public static void playSmgSound() {
-		SMG_POOL.play();
+		dispatch(SMG_POOL);
 	}
 
 	public static void playPistolSound() {
-		PISTOL_POOL.play();
+		dispatch(PISTOL_POOL);
 	}
 
 	public static void playShotgunSound() {
-		SHOTGUN_POOL.play();
+		dispatch(SHOTGUN_POOL);
+	}
+
+	private static void dispatch(SoundPool pool) {
+		try {
+			AUDIO_EXECUTOR.execute(pool::play);
+		} catch (RejectedExecutionException ignored) {
+			// Ignore: en cas de saturation/extinction, on prefere dropper un son.
+		}
 	}
 
 	private static final class SoundPool {
