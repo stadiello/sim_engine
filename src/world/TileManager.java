@@ -10,7 +10,9 @@ public class TileManager {
 
     public enum MapType {
         CITY("Ville"),
-        DESERT_OUTPOST("Avant-poste desert");
+        DESERT_OUTPOST("Avant-poste desert"),
+        DENSE_FOREST("Foret dense"),
+        DESERT_TACTICAL("Desert tactique");
 
         private final String displayName;
 
@@ -97,6 +99,8 @@ public class TileManager {
         map = switch (mapType) {
             case CITY -> buildCityMapData();
             case DESERT_OUTPOST -> buildDesertMapData();
+            case DENSE_FOREST -> buildDenseForestMapData();
+            case DESERT_TACTICAL -> buildDesertTacticalMapData();
         };
     }
 
@@ -223,6 +227,132 @@ public class TileManager {
         return mapData;
     }
 
+    private int[][] buildDenseForestMapData() {
+        int rows = 36;
+        int cols = 48;
+        int[][] mapData = new int[rows][cols];
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                mapData[row][col] = 2;
+            }
+        }
+
+        // Sentiers principaux pour la lisibilite du deplacement.
+        for (int col = 1; col < cols - 1; col++) {
+            mapData[6][col] = 1;
+            mapData[18][col] = 1;
+            mapData[29][col] = 1;
+        }
+        for (int row = 1; row < rows - 1; row++) {
+            mapData[row][10] = 1;
+            mapData[row][23] = 1;
+            mapData[row][37] = 1;
+        }
+
+        // Clairieres de combat et zone de spawn de depart preservee.
+        carveClearing(mapData, 4, 3, 7, 6);
+        carveClearing(mapData, 16, 10, 7, 6);
+        carveClearing(mapData, 30, 8, 8, 6);
+        carveClearing(mapData, 13, 22, 8, 7);
+        carveClearing(mapData, 32, 22, 8, 8);
+
+        // Couloirs de circulation garantis pour eviter les blocages.
+        for (int row = 1; row < rows - 1; row++) {
+            mapData[row][4] = 1;
+            mapData[row][5] = 1;
+            mapData[row][6] = 1;
+        }
+        for (int col = 1; col < cols - 1; col++) {
+            mapData[12][col] = 1;
+            mapData[24][col] = 1;
+        }
+
+        // Foret dense avec arbres bloquants en laissant les sentiers libres.
+        for (int row = 1; row < rows - 1; row++) {
+            for (int col = 1; col < cols - 1; col++) {
+                if (mapData[row][col] != 2) {
+                    continue;
+                }
+
+                boolean densePattern = ((row * 17 + col * 31) % 7) < 3;
+                boolean clusterPattern = (row % 5 == 0 && col % 3 != 0) || (col % 6 == 0 && row % 4 != 0);
+                if (densePattern || clusterPattern) {
+                    mapData[row][col] = 6;
+                }
+            }
+        }
+
+        // Quelques couverts secondaires en caisses.
+        addCrateCluster(mapData, 19, 4, 2, 2);
+        addCrateCluster(mapData, 26, 15, 3, 2);
+        addCrateCluster(mapData, 35, 27, 2, 2);
+
+        applyWorldBorders(mapData);
+        return mapData;
+    }
+
+    private int[][] buildDesertTacticalMapData() {
+        int rows = 36;
+        int cols = 48;
+        int[][] mapData = new int[rows][cols];
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                mapData[row][col] = 7;
+            }
+        }
+
+        // Dunes dynamiques en arcs pour fragmenter les lignes de vue.
+        for (int row = 2; row < rows - 2; row++) {
+            for (int col = 2; col < cols - 2; col++) {
+                int wave = (row * 3 + col * 5) % 11;
+                if (wave <= 2 || (row % 8 == 0 && col % 2 == 0)) {
+                    mapData[row][col] = 1;
+                }
+            }
+        }
+
+        // Oasis centrale avec anneau praticable.
+        addOasis(mapData, 23, 17, 4);
+        for (int row = 11; row <= 23; row++) {
+            mapData[row][23] = 0;
+        }
+        for (int col = 17; col <= 29; col++) {
+            mapData[17][col] = 0;
+        }
+
+        // Ruines: murs en U et petits blocs pour creer des angles tactiques.
+        addRuinBlock(mapData, 6, 7, 8, 6, true);
+        addRuinBlock(mapData, 31, 6, 10, 6, false);
+        addRuinBlock(mapData, 9, 23, 8, 7, false);
+        addRuinBlock(mapData, 30, 23, 10, 7, true);
+
+        // Couverts en caisses, positionnes pour des combats en echelon.
+        addCrateCluster(mapData, 18, 6, 3, 2);
+        addCrateCluster(mapData, 24, 8, 2, 3);
+        addCrateCluster(mapData, 15, 14, 2, 2);
+        addCrateCluster(mapData, 28, 14, 3, 2);
+        addCrateCluster(mapData, 18, 24, 2, 3);
+        addCrateCluster(mapData, 26, 26, 3, 2);
+        addCrateCluster(mapData, 38, 18, 2, 3);
+
+        // Couloir de spawn de gauche garanti non bloque.
+        for (int row = 1; row < rows - 1; row++) {
+            mapData[row][4] = 7;
+            mapData[row][5] = 7;
+            mapData[row][6] = 7;
+        }
+        for (int col = 1; col < 10; col++) {
+            mapData[4][col] = 7;
+            mapData[5][col] = 7;
+            mapData[6][col] = 7;
+        }
+
+        applyWorldBorders(mapData);
+        return mapData;
+    }
+
     private void addBuildingBlock(int[][] mapData, int startCol, int startRow, int width, int height) {
         int endRow = Math.min(mapData.length, startRow + height);
         int endCol = Math.min(mapData[0].length, startCol + width);
@@ -251,8 +381,97 @@ public class TileManager {
         }
     }
 
+    private void carveClearing(int[][] mapData, int startCol, int startRow, int width, int height) {
+        int endRow = Math.min(mapData.length - 1, startRow + height);
+        int endCol = Math.min(mapData[0].length - 1, startCol + width);
+        for (int row = Math.max(1, startRow); row < endRow; row++) {
+            for (int col = Math.max(1, startCol); col < endCol; col++) {
+                mapData[row][col] = 1;
+            }
+        }
+    }
+
+    private void addOasis(int[][] mapData, int centerCol, int centerRow, int radius) {
+        for (int row = centerRow - radius - 1; row <= centerRow + radius + 1; row++) {
+            for (int col = centerCol - radius - 1; col <= centerCol + radius + 1; col++) {
+                if (row <= 0 || row >= mapData.length - 1 || col <= 0 || col >= mapData[0].length - 1) {
+                    continue;
+                }
+
+                int dx = col - centerCol;
+                int dy = row - centerRow;
+                int distSq = dx * dx + dy * dy;
+                if (distSq <= radius * radius) {
+                    mapData[row][col] = 2;
+                } else if (distSq <= (radius + 1) * (radius + 1)) {
+                    mapData[row][col] = 0;
+                }
+            }
+        }
+    }
+
+    private void addRuinBlock(int[][] mapData, int startCol, int startRow, int width, int height, boolean openToRight) {
+        int endRow = Math.min(mapData.length - 1, startRow + height);
+        int endCol = Math.min(mapData[0].length - 1, startCol + width);
+        for (int row = Math.max(1, startRow); row < endRow; row++) {
+            for (int col = Math.max(1, startCol); col < endCol; col++) {
+                mapData[row][col] = 7;
+            }
+        }
+
+        for (int col = startCol; col < endCol; col++) {
+            if (col > 0 && col < mapData[0].length - 1) {
+                if (startRow > 0 && startRow < mapData.length - 1) {
+                    mapData[startRow][col] = 3;
+                }
+                if (endRow - 1 > 0 && endRow - 1 < mapData.length - 1) {
+                    mapData[endRow - 1][col] = 3;
+                }
+            }
+        }
+
+        if (openToRight) {
+            for (int row = startRow; row < endRow; row++) {
+                if (row > 0 && row < mapData.length - 1 && startCol > 0 && startCol < mapData[0].length - 1) {
+                    mapData[row][startCol] = 3;
+                }
+            }
+        } else {
+            for (int row = startRow; row < endRow; row++) {
+                if (row > 0 && row < mapData.length - 1 && endCol - 1 > 0 && endCol - 1 < mapData[0].length - 1) {
+                    mapData[row][endCol - 1] = 3;
+                }
+            }
+        }
+
+        int pillarCol = openToRight ? endCol - 2 : startCol + 1;
+        for (int row = startRow + 1; row < endRow - 1; row += 2) {
+            if (row > 0 && row < mapData.length - 1 && pillarCol > 0 && pillarCol < mapData[0].length - 1) {
+                mapData[row][pillarCol] = 3;
+            }
+        }
+    }
+
+    private void applyWorldBorders(int[][] mapData) {
+        int rows = mapData.length;
+        int cols = mapData[0].length;
+        for (int col = 0; col < cols; col++) {
+            mapData[0][col] = 3;
+            mapData[rows - 1][col] = 3;
+        }
+        for (int row = 0; row < rows; row++) {
+            mapData[row][0] = 3;
+            mapData[row][cols - 1] = 3;
+        }
+    }
+
     public void drawPreview(Graphics2D g2d, Rectangle rect, MapType mapType) {
-        int[][] previewMap = mapType == MapType.CITY ? buildCityMapData() : buildDesertMapData();
+        int[][] previewMap = switch (mapType) {
+            case CITY -> buildCityMapData();
+            case DESERT_OUTPOST -> buildDesertMapData();
+            case DENSE_FOREST -> buildDenseForestMapData();
+            case DESERT_TACTICAL -> buildDesertTacticalMapData();
+        };
         int rows = previewMap.length;
         int cols = previewMap[0].length;
 
