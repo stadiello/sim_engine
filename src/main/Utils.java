@@ -9,10 +9,10 @@ import javax.sound.sampled.Clip;
 
 public class Utils {
 
-	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4);
-	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10);
-	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5);
-	private static final SoundPool SHOTGUN_POOL = new SoundPool("/sound/shotGun.wav", 3);
+	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4, 8_000_000L);
+	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10, 12_000_000L);
+	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5, 20_000_000L);
+	private static final SoundPool SHOTGUN_POOL = new SoundPool("/sound/shotGun.wav", 3, 45_000_000L);
 
 	private Utils() {}
 
@@ -34,9 +34,13 @@ public class Utils {
 
 	private static final class SoundPool {
 		private final List<Clip> clips = new ArrayList<>();
+		private final long minReplayIntervalNanos;
 		private int roundRobinIndex = 0;
+		private long lastPlayNanos = 0L;
+		private boolean hasPlayed = false;
 
-		SoundPool(String resourcePath, int poolSize) {
+		SoundPool(String resourcePath, int poolSize, long minReplayIntervalNanos) {
+			this.minReplayIntervalNanos = Math.max(0L, minReplayIntervalNanos);
 			for (int i = 0; i < poolSize; i++) {
 				Clip clip = createClip(resourcePath);
 				if (clip != null) {
@@ -50,6 +54,13 @@ public class Utils {
 				return;
 			}
 
+			long now = System.nanoTime();
+			if (hasPlayed && now - lastPlayNanos < minReplayIntervalNanos) {
+				return;
+			}
+			lastPlayNanos = now;
+			hasPlayed = true;
+
 			Clip clip = findAvailableClip();
 			if (clip == null) {
 				clip = clips.get(roundRobinIndex);
@@ -62,8 +73,12 @@ public class Utils {
 		}
 
 		private Clip findAvailableClip() {
-			for (Clip clip : clips) {
+			int count = clips.size();
+			for (int i = 0; i < count; i++) {
+				int idx = (roundRobinIndex + i) % count;
+				Clip clip = clips.get(idx);
 				if (!clip.isRunning()) {
+					roundRobinIndex = (idx + 1) % count;
 					return clip;
 				}
 			}

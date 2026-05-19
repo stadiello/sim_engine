@@ -11,6 +11,7 @@ public class ObjectManager {
 
     // Liste centrale conservée pour compatibilité avec le reste du code.
     public static final ManagedObjectList list = new ManagedObjectList();
+    private static final Object LOCK = new Object();
     private static TileManager tileManager;
     private static final ArrayList<Homme> livingHumans = new ArrayList<>();
     private static final ArrayList<Homme> alliedTargets = new ArrayList<>();
@@ -30,107 +31,154 @@ public class ObjectManager {
         return tileManager;
     }
 
+    public static Soldat getSoldat() {
+        synchronized (LOCK) {
+            for (GameObject obj : list) {
+                if (obj instanceof Soldat soldat && !pendingRemovalSet.contains(soldat)) {
+                    return soldat;
+                }
+            }
+            return null;
+        }
+    }
+
+    public static int[] getUiCounts() {
+        synchronized (LOCK) {
+            int civils = 0;
+            int soldats = 0;
+            int aliensCount = 0;
+
+            for (GameObject obj : list) {
+                if (pendingRemovalSet.contains(obj)) {
+                    continue;
+                }
+
+                if (obj instanceof Homme && !(obj instanceof Soldat) && !(obj instanceof Alien)) {
+                    civils++;
+                } else if (obj instanceof Soldat) {
+                    soldats++;
+                } else if (obj instanceof Alien) {
+                    aliensCount++;
+                }
+            }
+
+            return new int[]{civils, soldats, aliensCount};
+        }
+    }
+
     public static Iterable<Homme> getLivingHumans() {
         return livingHumans;
     }
 
     public static Alien getNearestAlien(double x, double y) {
-        Alien nearest = null;
-        double minDist = Double.MAX_VALUE;
-        for (Alien alien : aliens) {
-            if (pendingRemovalSet.contains(alien)) {
-                continue;
-            }
+        synchronized (LOCK) {
+            Alien nearest = null;
+            double minDist = Double.MAX_VALUE;
+            for (Alien alien : aliens) {
+                if (pendingRemovalSet.contains(alien)) {
+                    continue;
+                }
 
-            double dx = alien.x - x;
-            double dy = alien.y - y;
-            double dist = dx * dx + dy * dy; // distance au carré pour éviter la racine carrée
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = alien;
+                double dx = alien.x - x;
+                double dy = alien.y - y;
+                double dist = dx * dx + dy * dy; // distance au carré pour éviter la racine carrée
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = alien;
+                }
             }
+            return nearest;
         }
-        return nearest;
     }
 
     public static Homme getNearestAlliedTarget(double x, double y) {
-        Homme nearest = null;
-        double minDist = Double.MAX_VALUE;
+        synchronized (LOCK) {
+            Homme nearest = null;
+            double minDist = Double.MAX_VALUE;
 
-        for (Homme ally : alliedTargets) {
-            if (pendingRemovalSet.contains(ally)) {
-                continue;
+            for (Homme ally : alliedTargets) {
+                if (pendingRemovalSet.contains(ally)) {
+                    continue;
+                }
+
+                double dx = ally.x - x;
+                double dy = ally.y - y;
+                double dist = dx * dx + dy * dy;
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = ally;
+                }
             }
 
-            double dx = ally.x - x;
-            double dy = ally.y - y;
-            double dist = dx * dx + dy * dy;
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = ally;
-            }
+            return nearest;
         }
-
-        return nearest;
     }
 
     public static Homme getNearestHostileForSoldat(double x, double y) {
-        Homme nearest = null;
-        double minDist = Double.MAX_VALUE;
+        synchronized (LOCK) {
+            Homme nearest = null;
+            double minDist = Double.MAX_VALUE;
 
-        for (Homme hostile : soldierHostiles) {
-            if (pendingRemovalSet.contains(hostile)) {
-                continue;
+            for (Homme hostile : soldierHostiles) {
+                if (pendingRemovalSet.contains(hostile)) {
+                    continue;
+                }
+
+                double dx = hostile.x - x;
+                double dy = hostile.y - y;
+                double dist = dx * dx + dy * dy;
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = hostile;
+                }
             }
 
-            double dx = hostile.x - x;
-            double dy = hostile.y - y;
-            double dist = dx * dx + dy * dy;
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = hostile;
-            }
+            return nearest;
         }
-
-        return nearest;
     }
 
     public static Protagonist getProtagonist() {
-        return protagonist != null && !pendingRemovalSet.contains(protagonist) ? protagonist : null;
+        synchronized (LOCK) {
+            return protagonist != null && !pendingRemovalSet.contains(protagonist) ? protagonist : null;
+        }
     }
 
     public static void updateAll() {
-        updating = true;
-        int count = list.size();
-        for (int i = 0; i < count; i++) {
-            GameObject obj = list.get(i);
-            if (pendingRemovalSet.contains(obj)) {
-                continue;
+        synchronized (LOCK) {
+            updating = true;
+            int count = list.size();
+            for (int i = 0; i < count; i++) {
+                GameObject obj = list.get(i);
+                if (pendingRemovalSet.contains(obj)) {
+                    continue;
+                }
+                obj.update();
             }
-            obj.update();
+            updating = false;
+            flushPendingChanges();
         }
-        updating = false;
-        flushPendingChanges();
     }
 
     public static void drawAll(Graphics g) {
-        // Dessine d'abord les douilles pour qu'elles restent sous les personnages.
-        for (GameObject obj : list) {
-            if (pendingRemovalSet.contains(obj)) {
-                continue;
+        synchronized (LOCK) {
+            // Dessine d'abord les douilles pour qu'elles restent sous les personnages.
+            for (GameObject obj : list) {
+                if (pendingRemovalSet.contains(obj)) {
+                    continue;
+                }
+                if (obj instanceof Douille) {
+                    obj.draw(g);
+                }
             }
-            if (obj instanceof Douille) {
-                obj.draw(g);
-            }
-        }
 
-        // Dessine ensuite tout le reste.
-        for (GameObject obj : list) {
-            if (pendingRemovalSet.contains(obj)) {
-                continue;
-            }
-            if (!(obj instanceof Douille)) {
-                obj.draw(g);
+            // Dessine ensuite tout le reste.
+            for (GameObject obj : list) {
+                if (pendingRemovalSet.contains(obj)) {
+                    continue;
+                }
+                if (!(obj instanceof Douille)) {
+                    obj.draw(g);
+                }
             }
         }
     }
@@ -224,13 +272,15 @@ public class ObjectManager {
     public static final class ManagedObjectList extends ArrayList<GameObject> {
         @Override
         public boolean add(GameObject obj) {
-            if (updating) {
-                pendingAdditions.add(obj);
+            synchronized (LOCK) {
+                if (updating) {
+                    pendingAdditions.add(obj);
+                    return true;
+                }
+
+                addInternal(obj);
                 return true;
             }
-
-            addInternal(obj);
-            return true;
         }
 
         @Override
@@ -240,18 +290,20 @@ public class ObjectManager {
 
         @Override
         public boolean remove(Object obj) {
-            if (!(obj instanceof GameObject gameObject)) {
-                return false;
-            }
-
-            if (updating) {
-                if (pendingRemovalSet.add(gameObject)) {
-                    pendingRemovals.add(gameObject);
+            synchronized (LOCK) {
+                if (!(obj instanceof GameObject gameObject)) {
+                    return false;
                 }
-                return true;
-            }
 
-            return removeInternal(gameObject);
+                if (updating) {
+                    if (pendingRemovalSet.add(gameObject)) {
+                        pendingRemovals.add(gameObject);
+                    }
+                    return true;
+                }
+
+                return removeInternal(gameObject);
+            }
         }
 
         @Override
@@ -263,7 +315,9 @@ public class ObjectManager {
 
         @Override
         public void clear() {
-            clearInternal();
+            synchronized (LOCK) {
+                clearInternal();
+            }
         }
 
         @Override
@@ -291,13 +345,15 @@ public class ObjectManager {
 
         @Override
         public boolean retainAll(java.util.Collection<?> collection) {
-            ArrayList<GameObject> toRemove = new ArrayList<>();
-            for (GameObject obj : this) {
-                if (!collection.contains(obj)) {
-                    toRemove.add(obj);
+            synchronized (LOCK) {
+                ArrayList<GameObject> toRemove = new ArrayList<>();
+                for (GameObject obj : this) {
+                    if (!collection.contains(obj)) {
+                        toRemove.add(obj);
+                    }
                 }
+                return removeAll(toRemove);
             }
-            return removeAll(toRemove);
         }
 
         private boolean directAdd(GameObject obj) {

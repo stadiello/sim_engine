@@ -437,22 +437,8 @@ public class GamePanel extends JPanel implements Runnable {
         return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
-    private Protagonist findProtagonist() {
-        for (GameObject obj : ObjectManager.list) {
-            if (obj instanceof Protagonist protagonist) {
-                return protagonist;
-            }
-        }
-        return null;
-    }
-
     private Soldat findSoldat() {
-        for (GameObject obj : ObjectManager.list) {
-            if (obj instanceof Soldat soldat) {
-                return soldat;
-            }
-        }
-        return null;
+        return ObjectManager.getSoldat();
     }
 
     private void applySoldierMoveCommand() {
@@ -483,15 +469,10 @@ public class GamePanel extends JPanel implements Runnable {
 
     private void drawUI(Graphics g) {
         // Affiche le compteur des entites encore en vie.
-        int civils = 0;
-        int soldats = 0;
-        int aliens = 0;
-
-        for (var obj : ObjectManager.list) {
-            if (obj instanceof Homme && !(obj instanceof Soldat) && !(obj instanceof Alien)) civils++;
-            else if (obj instanceof Soldat) soldats++;
-            else if (obj instanceof Alien) aliens++;
-        }
+        int[] counts = ObjectManager.getUiCounts();
+        int civils = counts[0];
+        int soldats = counts[1];
+        int aliens = counts[2];
 
         g.setColor(Color.WHITE);
         g.drawString("Civils: " + civils, 10, 20);
