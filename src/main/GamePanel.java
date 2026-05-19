@@ -627,10 +627,10 @@ public class GamePanel extends JPanel implements Runnable {
         FontMetrics titleFm = g2d.getFontMetrics();
         g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, 130);
 
-        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 20f));
-        g2d.drawString("- P : mettre le jeu en pause/reprendre", 130, 190);
-        g2d.drawString("- Clic droit : envoyer le soldat", 130, 220);
-        g2d.drawString("- Clic gauche : tirer", 130, 250);
+        // g2d.setFont(oldFont.deriveFont(Font.PLAIN, 20f));
+        // g2d.drawString("- P : mettre le jeu en pause/reprendre", 130, 190);
+        // g2d.drawString("- Clic droit : envoyer le soldat", 130, 220);
+        // g2d.drawString("- Clic gauche : tirer", 130, 250);
 
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 22f));
         g2d.drawString("Options de partie et IA", 130, AI_OPTIONS_BASE_Y - 34);

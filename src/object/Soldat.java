@@ -18,6 +18,12 @@ public class Soldat extends Homme {
     private static final double ENTITY_RADIUS = 14.0; // Rayon utilisé pour les vérifications de collision et de ligne de vue, pas forcément égal à la moitié de la taille du sprite
     private static final int COVER_MEMORY_FRAMES = 22; // Combien de temps le soldat "se souvient" d'un point de couverture avant de chercher un nouveau (en frames)
     private static final double VELOCITY_BLEND = 0.34; // Plus élevé = mouvements plus réactifs mais plus saccadés, plus bas = mouvements plus fluides mais plus lents à réagir
+    private static final int BURST_PAUSE_MIN_FRAMES = 5;
+    private static final int BURST_PAUSE_MAX_FRAMES = 16;
+    private static final int SUPPRESSIVE_FIRE_MIN_FRAMES = 8;
+    private static final int SUPPRESSIVE_FIRE_MAX_FRAMES = 22;
+    private static final int SUPPRESSIVE_REARM_MIN_FRAMES = 85;
+    private static final int SUPPRESSIVE_REARM_MAX_FRAMES = 155;
     private static Image imgCorps;
     private int shotAnimTimer = 0;
 
@@ -42,6 +48,10 @@ public class Soldat extends Homme {
     private double coverX;
     private double coverY;
     private int commandMovePriorityFrames = 0;
+    private int burstShotsRemaining = 0;
+    private int burstPauseTimer = 0;
+    private int suppressiveFireTimer = 0;
+    private int suppressiveRearminTimer = 0;
 
 
     static {
@@ -91,6 +101,15 @@ public class Soldat extends Homme {
         if (shootCooldown > 0) {
             shootCooldown--;
         }
+        if (burstPauseTimer > 0) {
+            burstPauseTimer--;
+        }
+        if (suppressiveFireTimer > 0) {
+            suppressiveFireTimer--;
+        }
+        if (suppressiveRearminTimer > 0) {
+            suppressiveRearminTimer--;
+        }
         if (shotAnimTimer > 0) {
             shotAnimTimer--;
         }
@@ -103,6 +122,10 @@ public class Soldat extends Homme {
                 focusedTarget = target;
                 reactionDelayTimer = AiTuning.getSoldierReactionFrames();
                 aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+                burstShotsRemaining = 0;
+                burstPauseTimer = 0;
+                suppressiveFireTimer = 0;
+                suppressiveRearminTimer = 0;
             }
 
             double dx = target.x - x;
@@ -136,6 +159,25 @@ public class Soldat extends Homme {
                 }
             } else {
                 aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+                if (suppressionStage <= 2
+                        && distance <= engageRange * 1.1
+                        && suppressiveFireTimer <= 0
+                        && suppressiveRearminTimer <= 0
+                        && Math.random() < 0.04) {
+                    suppressiveFireTimer = Math.max(
+                            suppressiveFireTimer,
+                            SUPPRESSIVE_FIRE_MIN_FRAMES + (int) (Math.random() * (SUPPRESSIVE_FIRE_MAX_FRAMES - SUPPRESSIVE_FIRE_MIN_FRAMES + 1))
+                    );
+                    suppressiveRearminTimer = SUPPRESSIVE_REARM_MIN_FRAMES
+                            + (int) (Math.random() * (SUPPRESSIVE_REARM_MAX_FRAMES - SUPPRESSIVE_REARM_MIN_FRAMES + 1));
+                }
+                if (suppressiveFireTimer > 0 && shootCooldown == 0 && burstPauseTimer == 0) {
+                    double[] shotDir = applySuppressiveSpread(dx, dy, distance, suppressionStage);
+                    carriedWeapon.fire(this, shotDir[0], shotDir[1]);
+                    shootCooldown = Math.max(1, carriedWeapon.getCooldownFrames() - 1);
+                    shotAnimTimer = 4;
+                    burstPauseTimer = BURST_PAUSE_MIN_FRAMES + 2 + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1));
+                }
             }
 
             if (!hasDestination && shouldSeekCover(hasLos, distance, optimalRange, suppressionStage)) {
@@ -156,16 +198,12 @@ public class Soldat extends Homme {
             if (!hasDestination && hasLos && distanceSq <= engageRange * engageRange) {
                 applyCombatMovement(dx, dy, distance, retreatRange, optimalRange, suppressionStage);
                 hasAttackTarget = true;
-                if (shootCooldown == 0 && aimSettleTimer <= 0 && suppressionStage < 3) {
+                if (shootCooldown == 0 && aimSettleTimer <= 0 && suppressionStage < 3 && canFireInCurrentBurst(suppressionStage)) {
                     carriedWeapon.fire(this, facingX, facingY);
                     shootCooldown = carriedWeapon.getCooldownFrames();
                     shotAnimTimer = 4;
                     aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
-                } else if (shootCooldown == 0 && aimSettleTimer <= 0 && Math.random() < 0.35) {
-                    carriedWeapon.fire(this, facingX, facingY);
-                    shootCooldown = carriedWeapon.getCooldownFrames();
-                    shotAnimTimer = 4;
-                    aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+                    consumeBurstShot(suppressionStage);
                 }
             }
         } else {
@@ -382,6 +420,72 @@ public class Soldat extends Homme {
 
     private void clearCover() {
         coverMemoryTimer = 0;
+    }
+
+    private boolean canFireInCurrentBurst(int suppressionStage) {
+        if (burstPauseTimer > 0) {
+            return false;
+        }
+        if (burstShotsRemaining > 0) {
+            return true;
+        }
+
+        burstShotsRemaining = chooseBurstSize(suppressionStage);
+        return true;
+    }
+
+    private void consumeBurstShot(int suppressionStage) {
+        if (burstShotsRemaining > 0) {
+            burstShotsRemaining--;
+        }
+        if (burstShotsRemaining <= 0) {
+            burstPauseTimer = BURST_PAUSE_MIN_FRAMES + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1));
+            if (!carriedWeapon.isAutomatic()) {
+                burstPauseTimer += 3;
+            }
+            if (suppressionStage >= 2) {
+                burstPauseTimer += 2;
+            }
+        }
+    }
+
+    private int chooseBurstSize(int suppressionStage) {
+        int minBurst;
+        int maxBurst;
+
+        if (carriedWeapon.isShotgun()) {
+            minBurst = 1;
+            maxBurst = 2;
+        } else if (carriedWeapon.isAutomatic()) {
+            minBurst = 3;
+            maxBurst = 5;
+        } else {
+            minBurst = 2;
+            maxBurst = 3;
+        }
+
+        if (suppressionStage >= 2) {
+            maxBurst = Math.max(minBurst, maxBurst - 1);
+        }
+
+        return minBurst + (int) (Math.random() * (maxBurst - minBurst + 1));
+    }
+
+    private double[] applySuppressiveSpread(double dx, double dy, double distance, int suppressionStage) {
+        double invDistance = 1.0 / Math.max(distance, EPSILON_DIST_SQ);
+        double dirX = dx * invDistance;
+        double dirY = dy * invDistance;
+        double extraErrorDeg = 9.0 + suppressionStage * 2.5 + getSuppressionLevel() * 3.0;
+        double randomAngle = (Math.random() * 2.0 - 1.0) * Math.toRadians(extraErrorDeg);
+        double cos = Math.cos(randomAngle);
+        double sin = Math.sin(randomAngle);
+        double outX = dirX * cos - dirY * sin;
+        double outY = dirX * sin + dirY * cos;
+        double len = Math.hypot(outX, outY);
+        if (len <= 0.0001) {
+            return new double[]{dirX, dirY};
+        }
+        return new double[]{outX / len, outY / len};
     }
 
     private void setFacingDirection(double targetX, double targetY) {

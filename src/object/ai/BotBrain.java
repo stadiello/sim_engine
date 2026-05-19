@@ -17,6 +17,12 @@ public class BotBrain {
     private static final double VELOCITY_BLEND = 0.35; // Plus élevé = mouvements plus réactifs mais plus saccadés, plus bas = mouvements plus fluides mais plus lents à réagir. Un nombre autour de 0.3 à 0.4 est souvent un bon compromis pour les jeux d'action en 2D, offrant une bonne réactivité tout en gardant les mouvements relativement fluides.
     private static final double ENEMY_AIM_ERROR_CLOSE_DEG = 2.2; // Erreur d'aim pour les ennemis à courte distance, en degrés. Un nombre plus élevé rend les ennemis moins précis à courte portée, ce qui peut être utile pour équilibrer les armes très puissantes ou à tir rapide, tandis qu'un nombre plus bas les rend plus précis et plus dangereux à courte portée.
     private static final double ENEMY_AIM_ERROR_FAR_DEG = 8.5; // Erreur d'aim pour les ennemis à longue distance, en degrés. Un nombre plus élevé rend les ennemis moins précis à longue portée, ce qui peut être utile pour équilibrer les armes à longue portée ou pour rendre les combats à distance plus dynamiques, tandis qu'un nombre plus bas les rend plus précis et plus dangereux à longue portée.
+    private static final int BURST_PAUSE_MIN_FRAMES = 6;
+    private static final int BURST_PAUSE_MAX_FRAMES = 18;
+    private static final int SUPPRESSIVE_FIRE_MIN_FRAMES = 10;
+    private static final int SUPPRESSIVE_FIRE_MAX_FRAMES = 24;
+    private static final int SUPPRESSIVE_REARM_MIN_FRAMES = 90;
+    private static final int SUPPRESSIVE_REARM_MAX_FRAMES = 170;
 
     private int shootCooldown = 0;
     private int losCheckCooldown = 0;
@@ -30,12 +36,25 @@ public class BotBrain {
     private int coverMemoryTimer = 0;
     private double coverX;
     private double coverY;
+    private int burstShotsRemaining = 0;
+    private int burstPauseTimer = 0;
+    private int suppressiveFireTimer = 0;
+    private int suppressiveRearminTimer = 0;
 
     public void update(Ennemi enemy) {
         enemy.tickSuppression();
 
         if (shootCooldown > 0) {
             shootCooldown--;
+        }
+        if (burstPauseTimer > 0) {
+            burstPauseTimer--;
+        }
+        if (suppressiveFireTimer > 0) {
+            suppressiveFireTimer--;
+        }
+        if (suppressiveRearminTimer > 0) {
+            suppressiveRearminTimer--;
         }
 
         Homme target = ObjectManager.getNearestAlliedTarget(enemy.x, enemy.y);
@@ -50,6 +69,10 @@ public class BotBrain {
             focusedTarget = target;
             reactionDelayTimer = AiTuning.getEnemyReactionFrames();
             aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+            burstShotsRemaining = 0;
+            burstPauseTimer = 0;
+            suppressiveFireTimer = 0;
+            suppressiveRearminTimer = 0;
         }
 
         double dx = target.x - enemy.x;
@@ -85,6 +108,25 @@ public class BotBrain {
             }
         } else {
             aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+            if (suppressionStage <= 2
+                    && dist <= engageRange * 1.1
+                    && suppressiveFireTimer <= 0
+                    && suppressiveRearminTimer <= 0
+                    && Math.random() < 0.035) {
+                suppressiveFireTimer = Math.max(
+                        suppressiveFireTimer,
+                        SUPPRESSIVE_FIRE_MIN_FRAMES + (int) (Math.random() * (SUPPRESSIVE_FIRE_MAX_FRAMES - SUPPRESSIVE_FIRE_MIN_FRAMES + 1))
+                );
+                suppressiveRearminTimer = SUPPRESSIVE_REARM_MIN_FRAMES
+                        + (int) (Math.random() * (SUPPRESSIVE_REARM_MAX_FRAMES - SUPPRESSIVE_REARM_MIN_FRAMES + 1));
+            }
+            if (suppressiveFireTimer > 0 && shootCooldown == 0 && burstPauseTimer == 0) {
+                double[] shotDir = applySuppressiveSpread(dx * invDist, dy * invDist, suppressionStage, suppressionLevel);
+                enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
+                enemy.onShot();
+                shootCooldown = Math.max(1, enemy.getCarriedWeapon().getCooldownFrames() - 1);
+                burstPauseTimer = BURST_PAUSE_MIN_FRAMES + 2 + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1));
+            }
         }
 
         if (shouldSeekCover(enemy, weapon, dist, hasLineOfSight, suppressionStage)) {
@@ -107,12 +149,13 @@ public class BotBrain {
         if (hasLineOfSight && dist <= engageRange) {
             applyCombatMovement(enemy, dx, dy, invDist, dist, retreatRange, optimalRange);
 
-            if (shootCooldown == 0 && aimSettleTimer <= 0) {
+            if (shootCooldown == 0 && aimSettleTimer <= 0 && canFireInCurrentBurst(enemy.getCarriedWeapon(), suppressionStage)) {
                 double[] shotDir = applyAimError(enemy, dx * invDist, dy * invDist, dist, suppressionStage, suppressionLevel);
                 enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
                 enemy.onShot();
                 shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
                 aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+                consumeBurstShot(enemy.getCarriedWeapon(), suppressionStage);
             }
             return;
         }
@@ -292,6 +335,70 @@ public class BotBrain {
 
     private void clearCover() {
         coverMemoryTimer = 0;
+    }
+
+    private boolean canFireInCurrentBurst(Weapon weapon, int suppressionStage) {
+        if (burstPauseTimer > 0) {
+            return false;
+        }
+        if (burstShotsRemaining > 0) {
+            return true;
+        }
+
+        int burstSize = chooseBurstSize(weapon, suppressionStage);
+        burstShotsRemaining = Math.max(1, burstSize);
+        return true;
+    }
+
+    private void consumeBurstShot(Weapon weapon, int suppressionStage) {
+        if (burstShotsRemaining > 0) {
+            burstShotsRemaining--;
+        }
+        if (burstShotsRemaining <= 0) {
+            burstPauseTimer = BURST_PAUSE_MIN_FRAMES + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1));
+            if (!weapon.isAutomatic()) {
+                burstPauseTimer += 3;
+            }
+            if (suppressionStage >= 2) {
+                burstPauseTimer += 2;
+            }
+        }
+    }
+
+    private int chooseBurstSize(Weapon weapon, int suppressionStage) {
+        int minBurst;
+        int maxBurst;
+
+        if (weapon.isShotgun()) {
+            minBurst = 1;
+            maxBurst = 2;
+        } else if (weapon.isAutomatic()) {
+            minBurst = 3;
+            maxBurst = 5;
+        } else {
+            minBurst = 2;
+            maxBurst = 3;
+        }
+
+        if (suppressionStage >= 2) {
+            maxBurst = Math.max(minBurst, maxBurst - 1);
+        }
+
+        return minBurst + (int) (Math.random() * (maxBurst - minBurst + 1));
+    }
+
+    private double[] applySuppressiveSpread(double dirX, double dirY, int suppressionStage, double suppressionLevel) {
+        double extraErrorDeg = 10.0 + suppressionStage * 2.5 + suppressionLevel * 3.0;
+        double randomAngle = (Math.random() * 2.0 - 1.0) * Math.toRadians(extraErrorDeg);
+        double cos = Math.cos(randomAngle);
+        double sin = Math.sin(randomAngle);
+        double outX = dirX * cos - dirY * sin;
+        double outY = dirX * sin + dirY * cos;
+        double len = Math.hypot(outX, outY);
+        if (len <= 0.0001) {
+            return new double[]{dirX, dirY};
+        }
+        return new double[]{outX / len, outY / len};
     }
 
     private void applySmoothedVelocity(Ennemi enemy, double desiredVx, double desiredVy) {
