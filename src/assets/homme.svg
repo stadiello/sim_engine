@@ -26,15 +26,15 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
-     inkscape:zoom="0.046324355"
-     inkscape:cx="3615.8086"
-     inkscape:cy="539.67292"
+     inkscape:zoom="0.09264871"
+     inkscape:cx="8084.3004"
+     inkscape:cy="4911.0236"
      inkscape:window-width="1512"
      inkscape:window-height="771"
      inkscape:window-x="0"
      inkscape:window-y="30"
      inkscape:window-maximized="0"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="layer2" />
   <defs
      id="defs1">
     <rect
@@ -364,6 +364,23 @@
      inkscape:groupmode="layer"
      id="layer2"
      inkscape:label="soldat">
+    <rect
+       style="fill:#ffdd55;fill-opacity:0.961956;stroke-width:1.865"
+       id="rect9"
+       width="119.94231"
+       height="154.21153"
+       x="2287.4712"
+       y="576.86536"
+       inkscape:export-filename="civils/pied_g.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#ffdd55;fill-opacity:0.961956;stroke-width:1.865"
+       id="rect9-9"
+       width="119.94231"
+       height="154.21153"
+       x="2510.3364"
+       y="574.1322" />
     <circle
        style="display:inline;fill:#88aa00;fill-opacity:1;stroke:#000000;stroke-width:0.265;stroke-dasharray:none;stroke-opacity:1"
        id="path1-2"

@@ -111,6 +111,7 @@ public class Soldat extends Homme {
             double engageRange = carriedWeapon.getAiEngageRange();
             double retreatRange = carriedWeapon.getAiRetreatRange();
             double optimalRange = carriedWeapon.getAiOptimalRange();
+            int suppressionStage = getSuppressionStage();
             if (distanceSq > EPSILON_DIST_SQ) {
                 double invDistance = 1.0 / Math.sqrt(distanceSq);
                 setFacingDirection(dx * invDistance, dy * invDistance);
@@ -128,14 +129,16 @@ public class Soldat extends Homme {
             }
 
             if (hasLos) {
-                if (aimSettleTimer > 0) {
+                if (suppressionStage >= 2) {
+                    aimSettleTimer = Math.min(aimSettleTimer + 1, AiTuning.getSoldierAimStabilizationFrames() + 4);
+                } else if (aimSettleTimer > 0) {
                     aimSettleTimer--;
                 }
             } else {
                 aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
             }
 
-            if (!hasDestination && shouldSeekCover(hasLos, distance, optimalRange)) {
+            if (!hasDestination && shouldSeekCover(hasLos, distance, optimalRange, suppressionStage)) {
                 if (moveToCover(target, optimalRange)) {
                     moveWithTileCollision(14);
                     timer++;
@@ -143,10 +146,22 @@ public class Soldat extends Homme {
                 }
             }
 
+            if (suppressionStage >= 3 && hasLos) {
+                applySuppressedFallbackMovement(dx, dy, distance, retreatRange);
+                moveWithTileCollision(14);
+                timer++;
+                return;
+            }
+
             if (!hasDestination && hasLos && distanceSq <= engageRange * engageRange) {
-                applyCombatMovement(dx, dy, distance, retreatRange, optimalRange);
+                applyCombatMovement(dx, dy, distance, retreatRange, optimalRange, suppressionStage);
                 hasAttackTarget = true;
-                if (shootCooldown == 0 && aimSettleTimer <= 0) {
+                if (shootCooldown == 0 && aimSettleTimer <= 0 && suppressionStage < 3) {
+                    carriedWeapon.fire(this, facingX, facingY);
+                    shootCooldown = carriedWeapon.getCooldownFrames();
+                    shotAnimTimer = 4;
+                    aimSettleTimer = AiTuning.getSoldierAimStabilizationFrames();
+                } else if (shootCooldown == 0 && aimSettleTimer <= 0 && Math.random() < 0.35) {
                     carriedWeapon.fire(this, facingX, facingY);
                     shootCooldown = carriedWeapon.getCooldownFrames();
                     shotAnimTimer = 4;
@@ -171,6 +186,8 @@ public class Soldat extends Homme {
     }
 
     private void updateMovement() {
+        double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
+
         if (hasDestination) {
             double dx = destinationX - x;
             double dy = destinationY - y;
@@ -186,8 +203,8 @@ public class Soldat extends Homme {
             }
 
             double invDistance = 1.0 / Math.sqrt(distanceSq);
-            double desiredVx = dx * invDistance * MOVE_SPEED;
-            double desiredVy = dy * invDistance * MOVE_SPEED;
+            double desiredVx = dx * invDistance * moveSpeed;
+            double desiredVy = dy * invDistance * moveSpeed;
             double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
             applySmoothedVelocity(adjusted[0], adjusted[1]);  // Applique la vélocité ajustée pour éviter les obstacles
             setFacingDirection(dx * invDistance, dy * invDistance); // Oriente le soldat vers sa destination
@@ -203,8 +220,8 @@ public class Soldat extends Homme {
 
             if (distanceSq > followDistanceSq && distanceSq > EPSILON_DIST_SQ) {
                 double invDistance = 1.0 / Math.sqrt(distanceSq);
-                double desiredVx = dx * invDistance * MOVE_SPEED;
-                double desiredVy = dy * invDistance * MOVE_SPEED;
+                double desiredVx = dx * invDistance * moveSpeed;
+                double desiredVy = dy * invDistance * moveSpeed;
                 double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
                 applySmoothedVelocity(adjusted[0], adjusted[1]);
                 setFacingDirection(dx * invDistance, dy * invDistance);
@@ -240,20 +257,24 @@ public class Soldat extends Homme {
         return losCachedVisible;
     }
 
-    private boolean shouldSeekCover(boolean hasLos, double distance, double optimalRange) {
+    private boolean shouldSeekCover(boolean hasLos, double distance, double optimalRange, int suppressionStage) {
         double suppressionBonus = isSuppressed() ? AiTuning.getSuppressionCoverBoost() * getSuppressionLevel() : 0.0;
 
         if (!hasLos) {
-            return distance <= carriedWeapon.getAiEngageRange() * (1.20 + suppressionBonus * 0.4);
+            double chaseWindow = suppressionStage >= 2 ? 1.35 : 1.20;
+            return distance <= carriedWeapon.getAiEngageRange() * (chaseWindow + suppressionBonus * 0.4);
         }
 
         int cooldownFrames = Math.max(1, carriedWeapon.getCooldownFrames());
         double ratio = shootCooldown / (double) cooldownFrames;
-        double threshold = Math.max(0.12, 0.45 - suppressionBonus * 0.22);
-        return ratio >= threshold && distance <= optimalRange * 1.35;
+        double threshold = Math.max(0.10, 0.45 - suppressionBonus * 0.22 - suppressionStage * 0.05);
+        double engageWindow = suppressionStage >= 3 ? optimalRange * 1.15 : optimalRange * 1.35;
+        return ratio >= threshold && distance <= engageWindow;
     }
 
     private boolean moveToCover(Homme target, double preferredRange) {
+        double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
+
         if (coverMemoryTimer <= 0 || !TacticalMovement.hasLineOfSight(x, y, coverX, coverY)) {
             double[] cover = TacticalMovement.findCoverPoint(x, y, target.x, target.y, ENTITY_RADIUS, preferredRange);
             if (cover == null) {
@@ -275,8 +296,8 @@ public class Soldat extends Homme {
         }
 
         double invDistance = 1.0 / Math.sqrt(distSq);
-        double desiredVx = dx * invDistance * MOVE_SPEED;
-        double desiredVy = dy * invDistance * MOVE_SPEED;
+        double desiredVx = dx * invDistance * moveSpeed;
+        double desiredVy = dy * invDistance * moveSpeed;
         double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
         applySmoothedVelocity(adjusted[0], adjusted[1]);
 
@@ -290,10 +311,13 @@ public class Soldat extends Homme {
         return true;
     }
 
-    private void applyCombatMovement(double dx, double dy, double distance, double retreatRange, double optimalRange) {
+    private void applyCombatMovement(double dx, double dy, double distance, double retreatRange, double optimalRange, int suppressionStage) {
+        double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
+
         if (strafeSwitchTimer <= 0) {
             strafeSign = Math.random() < 0.5 ? -1 : 1;
-            strafeSwitchTimer = 24 + (int) (Math.random() * 28);
+            int baseSwitch = suppressionStage >= 2 ? 16 : 24;
+            strafeSwitchTimer = baseSwitch + (int) (Math.random() * (suppressionStage >= 2 ? 16 : 28));
         } else {
             strafeSwitchTimer--;
         }
@@ -308,18 +332,50 @@ public class Soldat extends Homme {
         double dirY = dy * invDistance;
 
         double forwardFactor = 0;
-        if (distance < retreatRange) {
+        if (suppressionStage >= 3) {
+            forwardFactor = distance < retreatRange * 1.15 ? -1.15 : -0.65;
+        } else if (suppressionStage == 2) {
+            if (distance < retreatRange) {
+                forwardFactor = -1.0;
+            } else if (distance < optimalRange) {
+                forwardFactor = -0.55;
+            } else {
+                forwardFactor = 0.10;
+            }
+        } else if (distance < retreatRange) {
             forwardFactor = -1.0;
         } else if (distance > optimalRange) {
             forwardFactor = carriedWeapon.isShotgun() ? 0.70 : 0.30;
         }
 
         double strafeFactor = carriedWeapon.isShotgun() ? 0.30 : 0.80;
+        if (suppressionStage >= 2) {
+            strafeFactor *= 0.60;
+        } else if (suppressionStage == 1) {
+            strafeFactor *= 1.10;
+        }
         double perpX = -dirY * strafeSign;
         double perpY = dirX * strafeSign;
 
-        double desiredVx = (dirX * forwardFactor + perpX * strafeFactor) * MOVE_SPEED;
-        double desiredVy = (dirY * forwardFactor + perpY * strafeFactor) * MOVE_SPEED;
+        double desiredVx = (dirX * forwardFactor + perpX * strafeFactor) * moveSpeed;
+        double desiredVy = (dirY * forwardFactor + perpY * strafeFactor) * moveSpeed;
+        double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
+        applySmoothedVelocity(adjusted[0], adjusted[1]);
+    }
+
+    private void applySuppressedFallbackMovement(double dx, double dy, double distance, double retreatRange) {
+        double invDistance = 1.0 / Math.max(distance, EPSILON_DIST_SQ);
+        double dirX = dx * invDistance;
+        double dirY = dy * invDistance;
+        double sideSign = Math.random() < 0.5 ? -1 : 1;
+        double perpX = -dirY * sideSign;
+        double perpY = dirX * sideSign;
+        double panicFactor = distance < retreatRange ? -1.05 : -0.70;
+        double jitterFactor = 0.18 + getSuppressionLevel() * 0.25;
+        double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier() * 0.85;
+
+        double desiredVx = (dirX * panicFactor + perpX * jitterFactor) * moveSpeed;
+        double desiredVy = (dirY * panicFactor + perpY * jitterFactor) * moveSpeed;
         double[] adjusted = TacticalMovement.adjustForObstacles(x, y, desiredVx, desiredVy, ENTITY_RADIUS);
         applySmoothedVelocity(adjusted[0], adjusted[1]);
     }

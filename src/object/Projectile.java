@@ -10,7 +10,7 @@ import world.TileManager;
 
 public class Projectile extends GameObject {
 
-    private static final double ENEMY_SUPPRESSION_MULTIPLIER = 0.35;
+    private static final double ENEMY_SUPPRESSION_MULTIPLIER = 0.30;
 
     private static Image imgShot;
     private static Image imgBullet;
@@ -81,8 +81,14 @@ public class Projectile extends GameObject {
 
             if (hostile && distSq < suppressionRadiusSq) {
                 double dist = Math.sqrt(Math.max(0.0, distSq));
-                double intensity = (1.0 - (dist / suppressionRadius)) * getSuppressionMultiplier();
-                if (intensity > 0) {
+                double falloff = Math.max(0.0, 1.0 - (dist / suppressionRadius));
+                double intensity = falloff * falloff * getSuppressionMultiplier();
+                if (type == ProjectileType.SHOTGUN_PELLET) {
+                    intensity *= 0.35;
+                } else if (type == ProjectileType.BULLET) {
+                    intensity *= 1.10;
+                }
+                if (intensity > 0.01) {
                     homme.onIncomingFire(tireur, intensity);
                 }
             }

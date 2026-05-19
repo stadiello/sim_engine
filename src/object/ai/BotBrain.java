@@ -67,6 +67,8 @@ public class BotBrain {
         double retreatRange = weapon.getAiRetreatRange();
         double optimalRange = weapon.getAiOptimalRange();
         double engageRange = weapon.getAiEngageRange();
+        int suppressionStage = enemy.getSuppressionStage();
+        double suppressionLevel = enemy.getSuppressionLevel();
         boolean hasLineOfSight = canSeeTarget(enemy, target, distSq);
 
         enemy.setFacingDirection(dx, dy);
@@ -85,10 +87,15 @@ public class BotBrain {
             aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
         }
 
-        if (shouldSeekCover(enemy, weapon, dist, hasLineOfSight)) {
+        if (shouldSeekCover(enemy, weapon, dist, hasLineOfSight, suppressionStage)) {
             if (moveToCover(enemy, target, optimalRange)) {
                 return;
             }
+        }
+
+        if (suppressionStage >= 3 && hasLineOfSight) {
+            applySuppressedFallbackMovement(enemy, dx, dy, invDist, dist, retreatRange, suppressionLevel);
+            return;
         }
 
         if (coverMemoryTimer > 0) {
@@ -101,7 +108,7 @@ public class BotBrain {
             applyCombatMovement(enemy, dx, dy, invDist, dist, retreatRange, optimalRange);
 
             if (shootCooldown == 0 && aimSettleTimer <= 0) {
-                double[] shotDir = applyAimError(enemy, dx * invDist, dy * invDist, dist);
+                double[] shotDir = applyAimError(enemy, dx * invDist, dy * invDist, dist, suppressionStage, suppressionLevel);
                 enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
                 enemy.onShot();
                 shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
@@ -111,9 +118,10 @@ public class BotBrain {
         }
 
         clearCover();
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
         double pushFactor = weapon.isShotgun() ? AGGRESSIVE_PUSH_FACTOR : 1.0;
-        double desiredVx = dx * invDist * CHASE_SPEED * pushFactor;
-        double desiredVy = dy * invDist * CHASE_SPEED * pushFactor;
+        double desiredVx = dx * invDist * moveSpeed * pushFactor;
+        double desiredVy = dy * invDist * moveSpeed * pushFactor;
         double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, desiredVx, desiredVy, ENTITY_RADIUS);
         applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
     }
@@ -141,20 +149,24 @@ public class BotBrain {
         return losCachedVisible;
     }
 
-    private boolean shouldSeekCover(Ennemi enemy, Weapon weapon, double dist, boolean hasLineOfSight) {
+    private boolean shouldSeekCover(Ennemi enemy, Weapon weapon, double dist, boolean hasLineOfSight, int suppressionStage) {
         double suppressionBonus = enemy.isSuppressed() ? AiTuning.getSuppressionCoverBoost() * enemy.getSuppressionLevel() : 0.0;
 
         if (!hasLineOfSight) {
-            return dist <= weapon.getAiEngageRange() * (1.15 + suppressionBonus * 0.4);
+            double chaseWindow = suppressionStage >= 2 ? 1.35 : 1.15;
+            return dist <= weapon.getAiEngageRange() * (chaseWindow + suppressionBonus * 0.4);
         }
 
         int cooldownFrames = Math.max(1, weapon.getCooldownFrames());
         double ratio = shootCooldown / (double) cooldownFrames;
-        double threshold = Math.max(0.12, COVER_SEARCH_MIN_COOLDOWN_RATIO - suppressionBonus * 0.22);
-        return ratio >= threshold && dist <= weapon.getAiEngageRange();
+        double threshold = Math.max(0.08, COVER_SEARCH_MIN_COOLDOWN_RATIO - suppressionBonus * 0.22 - suppressionStage * 0.06);
+        double engageWindow = suppressionStage >= 3 ? weapon.getAiEngageRange() * 1.15 : weapon.getAiEngageRange();
+        return ratio >= threshold && dist <= engageWindow;
     }
 
     private boolean moveToCover(Ennemi enemy, Homme target, double preferredRange) {
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
+
         if (coverMemoryTimer <= 0 || !TacticalMovement.hasLineOfSight(enemy.x, enemy.y, coverX, coverY)) {
             double[] cover = TacticalMovement.findCoverPoint(
                     enemy.x,
@@ -184,8 +196,8 @@ public class BotBrain {
         }
 
         double invCoverDist = 1.0 / Math.sqrt(coverDistSq);
-        double desiredVx = toCoverX * invCoverDist * CHASE_SPEED;
-        double desiredVy = toCoverY * invCoverDist * CHASE_SPEED;
+    double desiredVx = toCoverX * invCoverDist * moveSpeed;
+    double desiredVy = toCoverY * invCoverDist * moveSpeed;
         double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, desiredVx, desiredVy, ENTITY_RADIUS);
         applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
         enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
@@ -201,9 +213,14 @@ public class BotBrain {
             double retreatRange,
             double optimalRange
     ) {
+        int suppressionStage = enemy.getSuppressionStage();
+        double suppressionLevel = enemy.getSuppressionLevel();
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
+
         if (strafeSwitchTimer <= 0) {
             strafeSign = Math.random() < 0.5 ? -1 : 1;
-            strafeSwitchTimer = 24 + (int) (Math.random() * 24);
+            int baseSwitch = suppressionStage >= 2 ? 16 : 24;
+            strafeSwitchTimer = baseSwitch + (int) (Math.random() * (suppressionStage >= 2 ? 16 : 24));
         } else {
             strafeSwitchTimer--;
         }
@@ -212,20 +229,63 @@ public class BotBrain {
         double dirY = dy * invDist;
 
         double forwardFactor = 0;
-        if (dist < retreatRange) {
-            forwardFactor = -0.95;
-        } else if (dist < optimalRange * 0.90) {
-            forwardFactor = -0.35;
-        } else if (dist > optimalRange) {
-            forwardFactor = enemy.getCarriedWeapon().isShotgun() ? 0.30 : 0.18;
+        if (suppressionStage >= 3) {
+            forwardFactor = dist < retreatRange * 1.15 ? -1.10 : -0.55;
+        } else if (suppressionStage == 2) {
+            if (dist < retreatRange) {
+                forwardFactor = -1.0;
+            } else if (dist < optimalRange) {
+                forwardFactor = -0.50;
+            } else {
+                forwardFactor = 0.10;
+            }
+        } else {
+            if (dist < retreatRange) {
+                forwardFactor = -0.95;
+            } else if (dist < optimalRange * 0.90) {
+                forwardFactor = -0.35;
+            } else if (dist > optimalRange) {
+                forwardFactor = enemy.getCarriedWeapon().isShotgun() ? 0.30 : 0.18;
+            }
         }
 
         double strafeFactor = enemy.getCarriedWeapon().isShotgun() ? 0.45 : 0.72;
+        if (suppressionStage >= 2) {
+            strafeFactor *= 0.60;
+        } else if (suppressionStage == 1) {
+            strafeFactor *= 1.10;
+        }
+
+            strafeFactor *= 1.0 - 0.12 * suppressionLevel;
         double perpX = -dirY * strafeSign;
         double perpY = dirX * strafeSign;
 
-        double rawVx = (dirX * forwardFactor + perpX * strafeFactor) * CHASE_SPEED;
-        double rawVy = (dirY * forwardFactor + perpY * strafeFactor) * CHASE_SPEED;
+        double rawVx = (dirX * forwardFactor + perpX * strafeFactor) * moveSpeed;
+        double rawVy = (dirY * forwardFactor + perpY * strafeFactor) * moveSpeed;
+        double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, rawVx, rawVy, ENTITY_RADIUS);
+        applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
+    }
+
+    private void applySuppressedFallbackMovement(
+            Ennemi enemy,
+            double dx,
+            double dy,
+            double invDist,
+            double dist,
+            double retreatRange,
+            double suppressionLevel
+    ) {
+        double dirX = dx * invDist;
+        double dirY = dy * invDist;
+        double panicFactor = dist < retreatRange ? -1.15 : -0.75;
+        double jitterFactor = 0.18 + suppressionLevel * 0.28;
+        double sideSign = Math.random() < 0.5 ? -1 : 1;
+        double perpX = -dirY * sideSign;
+        double perpY = dirX * sideSign;
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * 0.85;
+
+        double rawVx = (dirX * panicFactor + perpX * jitterFactor) * moveSpeed;
+        double rawVy = (dirY * panicFactor + perpY * jitterFactor) * moveSpeed;
         double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, rawVx, rawVy, ENTITY_RADIUS);
         applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
     }
@@ -245,12 +305,14 @@ public class BotBrain {
         }
     }
 
-    private double[] applyAimError(Ennemi enemy, double dirX, double dirY, double dist) {
+    private double[] applyAimError(Ennemi enemy, double dirX, double dirY, double dist, int suppressionStage, double suppressionLevel) {
         double engageRange = Math.max(1.0, enemy.getCarriedWeapon().getAiEngageRange());
         double t = Math.max(0.0, Math.min(1.0, dist / engageRange));
         double baseErrorDeg = ENEMY_AIM_ERROR_CLOSE_DEG + (ENEMY_AIM_ERROR_FAR_DEG - ENEMY_AIM_ERROR_CLOSE_DEG) * t;
         double movementPenalty = Math.hypot(enemy.vx, enemy.vy) > 0.2 ? 1.5 : 0.0;
-        double suppressionPenalty = enemy.isSuppressed() ? 2.5 * enemy.getSuppressionLevel() : 0.0;
+        double suppressionPenalty = enemy.isSuppressed()
+                ? (suppressionStage >= 3 ? 4.0 : suppressionStage == 2 ? 2.8 : 1.6) * suppressionLevel
+                : 0.0;
         double maxErrorRad = Math.toRadians(baseErrorDeg + movementPenalty + suppressionPenalty);
 
         double randomAngle = (Math.random() * 2.0 - 1.0) * maxErrorRad;

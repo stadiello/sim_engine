@@ -149,10 +149,10 @@ public class Protagonist extends Homme{
 
     @Override
     public void update() {
+        tickSuppression();
+
         double inputX = 0;
         double inputY = 0;
-        double startX = x;
-        double startY = y;
 
         TileManager tileManager = ObjectManager.getTileManager();
         int cameraX = tileManager != null ? tileManager.getCameraX() : 0;
@@ -176,6 +176,8 @@ public class Protagonist extends Homme{
                 shootCooldown--;
         }
 
+        double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
+
         if (keyController.isLeft()) inputX -= 1;
         if (keyController.isRight()) inputX += 1;
         if (keyController.isUp()) inputY -= 1;
@@ -196,8 +198,8 @@ public class Protagonist extends Homme{
             double dirX = inputX / length;
             double dirY = inputY / length;
 
-            vx = dirX * MOVE_SPEED;
-            vy = dirY * MOVE_SPEED;
+            vx = dirX * moveSpeed;
+            vy = dirY * moveSpeed;
         } else {
             vx = 0;
             vy = 0;
