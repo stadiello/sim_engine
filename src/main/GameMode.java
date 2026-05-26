@@ -2,7 +2,8 @@ package main;
 
 public enum GameMode {
     FREE,
-    STORY;
+    STORY,
+    PROTECTION;
 
     public static GameMode current = FREE;
 }

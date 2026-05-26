@@ -12,7 +12,8 @@ public class TileManager {
         CITY("Ville"),
         DESERT_OUTPOST("Avant-poste desert"),
         DENSE_FOREST("Foret dense"),
-        DESERT_TACTICAL("Desert tactique");
+        DESERT_TACTICAL("Desert tactique"),
+        NIGHT_BLACKOUT("Blackout nocturne");
 
         private final String displayName;
 
@@ -28,6 +29,7 @@ public class TileManager {
     GamePanel gp;
     Tile[] tiles;
     int[][] map;
+    int[][] tileDamage;
     private double cameraX;
     private double cameraY;
     private MapType currentMapType = MapType.CITY;
@@ -65,15 +67,16 @@ public class TileManager {
     // }
 
     private void loadTiles() {
-        tiles[0] = new Tile(TileGenerator.generateRoad(), false, false);
-        tiles[1] = new Tile(TileGenerator.generateSidewalk(), false, false);
-        tiles[2] = new Tile(TileGenerator.generateGrass(), false, false);
-        tiles[3] = new Tile(TileGenerator.generateWall(), true, false);
-        tiles[4] = new Tile(TileGenerator.generateBuilding(), true, false);
-        tiles[5] = new Tile(TileGenerator.generateDoor(), false, true);
-        tiles[6] = new Tile(TileGenerator.generateTree(), true, false);
-        tiles[7] = new Tile(TileGenerator.generateSand(), false, false);
-        tiles[8] = new Tile(TileGenerator.generateWoodenCrate(), true, false);
+        tiles[0] = new Tile(TileGenerator.generateRoad(), false, false, false, 0);
+        tiles[1] = new Tile(TileGenerator.generateSidewalk(), false, false, false, 0);
+        tiles[2] = new Tile(TileGenerator.generateGrass(), false, false, false, 0);
+        tiles[3] = new Tile(TileGenerator.generateWall(), true, false, false, 0);
+        tiles[4] = new Tile(TileGenerator.generateBuilding(), true, false, false, 0);
+        tiles[5] = new Tile(TileGenerator.generateDoor(), false, true, false, 0);
+        // HP plus élevés pour rendre la destruction visiblement progressive.
+        tiles[6] = new Tile(TileGenerator.generateTree(), true, false, true, 8);
+        tiles[7] = new Tile(TileGenerator.generateSand(), false, false, false, 0);
+        tiles[8] = new Tile(TileGenerator.generateWoodenCrate(), true, false, true, 6);
     }
 
     public void setCurrentMapType(MapType mapType) {
@@ -101,7 +104,10 @@ public class TileManager {
             case DESERT_OUTPOST -> buildDesertMapData();
             case DENSE_FOREST -> buildDenseForestMapData();
             case DESERT_TACTICAL -> buildDesertTacticalMapData();
+            case NIGHT_BLACKOUT -> buildNightBlackoutMapData();
         };
+
+        tileDamage = new int[map.length][map[0].length];
     }
 
     private int[][] buildCityMapData() {
@@ -159,6 +165,16 @@ public class TileManager {
             }
         }
 
+        placeDestructibleCovers(
+                mapData,
+                new int[][]{
+                        {11, 5, 8}, {25, 5, 8}, {37, 5, 8},
+                        {14, 14, 8}, {28, 14, 8},
+                        {11, 23, 8}, {24, 23, 8}, {38, 23, 8},
+                        {16, 30, 6}, {34, 30, 6}
+                }
+        );
+
         // Bord du monde bloque pour garder les entites dans la carte.
         for (int col = 0; col < cols; col++) {
             mapData[0][col] = 3;
@@ -207,6 +223,15 @@ public class TileManager {
         addCrateCluster(mapData, 29, 20, 2, 4);
         addCrateCluster(mapData, 8, 23, 3, 3);
         addCrateCluster(mapData, 39, 26, 3, 2);
+
+        placeDestructibleCovers(
+            mapData,
+            new int[][]{
+                {10, 5, 8}, {19, 6, 8}, {33, 8, 8},
+                {14, 15, 8}, {34, 16, 8},
+                {10, 27, 8}, {20, 28, 8}, {33, 29, 8}
+            }
+        );
 
         // Couloir de deplacement a gauche pour assurer un spawn initial libre.
         for (int row = 1; row < rows - 1; row++) {
@@ -288,6 +313,15 @@ public class TileManager {
         addCrateCluster(mapData, 26, 15, 3, 2);
         addCrateCluster(mapData, 35, 27, 2, 2);
 
+        placeDestructibleCovers(
+            mapData,
+            new int[][]{
+                {8, 7, 8}, {19, 7, 8}, {31, 7, 8},
+                {14, 18, 8}, {30, 18, 8},
+                {10, 27, 8}, {23, 27, 8}, {36, 27, 8}
+            }
+        );
+
         applyWorldBorders(mapData);
         return mapData;
     }
@@ -337,6 +371,15 @@ public class TileManager {
         addCrateCluster(mapData, 26, 26, 3, 2);
         addCrateCluster(mapData, 38, 18, 2, 3);
 
+        placeDestructibleCovers(
+            mapData,
+            new int[][]{
+                {12, 10, 8}, {21, 10, 8}, {33, 10, 8},
+                {12, 19, 8}, {34, 20, 8},
+                {14, 30, 8}, {24, 30, 8}, {36, 30, 8}
+            }
+        );
+
         // Couloir de spawn de gauche garanti non bloque.
         for (int row = 1; row < rows - 1; row++) {
             mapData[row][4] = 7;
@@ -348,6 +391,43 @@ public class TileManager {
             mapData[5][col] = 7;
             mapData[6][col] = 7;
         }
+
+        applyWorldBorders(mapData);
+        return mapData;
+    }
+
+    private int[][] buildNightBlackoutMapData() {
+        int[][] mapData = buildCityMapData();
+        int rows = mapData.length;
+        int cols = mapData[0].length;
+
+        for (int row = 1; row < rows - 1; row++) {
+            for (int col = 1; col < cols - 1; col++) {
+                if (mapData[row][col] == 2) {
+                    int pattern = (row * 19 + col * 11) % 13;
+                    if (pattern <= 2) {
+                        mapData[row][col] = 8;
+                    } else if (pattern == 3) {
+                        mapData[row][col] = 6;
+                    }
+                }
+            }
+        }
+
+        for (int row = 1; row < rows - 1; row++) {
+            mapData[row][4] = 1;
+            mapData[row][5] = 1;
+            mapData[row][6] = 1;
+        }
+
+        placeDestructibleCovers(
+            mapData,
+            new int[][]{
+                {13, 8, 8}, {27, 8, 8}, {39, 8, 8},
+                {14, 18, 8}, {29, 18, 8},
+                {12, 28, 8}, {27, 28, 8}, {39, 28, 8}
+            }
+        );
 
         applyWorldBorders(mapData);
         return mapData;
@@ -368,6 +448,31 @@ public class TileManager {
         int doorRow = endRow - 1;
         if (doorRow >= 0 && doorRow < mapData.length && doorCol >= 0 && doorCol < mapData[0].length) {
             mapData[doorRow][doorCol] = 5;
+        }
+    }
+
+    private void placeDestructibleCovers(int[][] mapData, int[][] placements) {
+        if (placements == null) {
+            return;
+        }
+
+        for (int[] placement : placements) {
+            if (placement == null || placement.length < 3) {
+                continue;
+            }
+
+            int col = placement[0];
+            int row = placement[1];
+            int tileId = placement[2];
+
+            if (row <= 0 || row >= mapData.length - 1 || col <= 0 || col >= mapData[0].length - 1) {
+                continue;
+            }
+
+            int currentTile = mapData[row][col];
+            if (currentTile == 0 || currentTile == 1 || currentTile == 2 || currentTile == 7) {
+                mapData[row][col] = tileId;
+            }
         }
     }
 
@@ -471,6 +576,7 @@ public class TileManager {
             case DESERT_OUTPOST -> buildDesertMapData();
             case DENSE_FOREST -> buildDenseForestMapData();
             case DESERT_TACTICAL -> buildDesertTacticalMapData();
+            case NIGHT_BLACKOUT -> buildNightBlackoutMapData();
         };
         int rows = previewMap.length;
         int cols = previewMap[0].length;
@@ -488,7 +594,8 @@ public class TileManager {
     }
 
     public void draw(Graphics g) {
-        Rectangle clip = g.getClipBounds();
+        Graphics2D g2d = (Graphics2D) g;
+        Rectangle clip = g2d.getClipBounds();
         int viewWidth = clip != null ? clip.width : 800;
         int viewHeight = clip != null ? clip.height : 600;
         int margin = 1;
@@ -503,9 +610,129 @@ public class TileManager {
                 int tileId = map[row][col];
                 int x = col * gp.tileSize;
                 int y = row * gp.tileSize;
-                g.drawImage(tiles[tileId].image, x, y, gp.tileSize, gp.tileSize, null);
+                g2d.drawImage(tiles[tileId].image, x, y, gp.tileSize, gp.tileSize, null);
+                drawDamageOverlay(g2d, row, col, tileId, x, y);
             }
         }
+    }
+
+    private void drawDamageOverlay(Graphics2D g2d, int row, int col, int tileId, int x, int y) {
+        Tile tile = tiles[tileId];
+        if (!tile.destructible || tile.hitPoints <= 0) {
+            return;
+        }
+
+        int damage = tileDamage[row][col];
+        if (damage <= 0) {
+            return;
+        }
+
+        double ratio = Math.min(1.0, damage / (double) tile.hitPoints);
+        int stage;
+        if (ratio < 0.34) {
+            stage = 1;
+        } else if (ratio < 0.67) {
+            stage = 2;
+        } else {
+            stage = 3;
+        }
+
+        Composite oldComposite = g2d.getComposite();
+        Stroke oldStroke = g2d.getStroke();
+        Color oldColor = g2d.getColor();
+
+        float tintAlpha = (float) (0.12 + ratio * 0.16);
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, tintAlpha));
+        g2d.setColor(new Color(35, 20, 12));
+        g2d.fillRect(x, y, gp.tileSize, gp.tileSize);
+
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, (float) (0.35 + ratio * 0.45)));
+        g2d.setColor(new Color(25, 10, 5));
+        g2d.setStroke(new BasicStroke(1.5f));
+
+        int left = x + 6;
+        int right = x + gp.tileSize - 6;
+        int top = y + 7;
+        int bottom = y + gp.tileSize - 7;
+        int centerX = x + gp.tileSize / 2;
+        int centerY = y + gp.tileSize / 2;
+
+        g2d.drawLine(left, top, right, bottom);
+        if (stage >= 2) {
+            g2d.drawLine(right, top + 5, left + 4, bottom - 3);
+            g2d.drawLine(centerX, top, centerX - 6, bottom);
+        }
+        if (stage >= 3) {
+            g2d.drawLine(left + 3, centerY, right - 2, centerY + 5);
+            g2d.drawLine(centerX + 5, top + 2, centerX - 8, centerY + 3);
+            g2d.drawLine(centerX + 8, centerY - 2, centerX - 2, bottom - 4);
+        }
+
+        g2d.setColor(oldColor);
+        g2d.setStroke(oldStroke);
+        g2d.setComposite(oldComposite);
+    }
+
+    public boolean damageTileAtPixel(double x, double y, int damage) {
+        if (damage <= 0) {
+            return false;
+        }
+
+        int col = (int) x / gp.tileSize;
+        int row = (int) y / gp.tileSize;
+        if (row < 0 || row >= map.length || col < 0 || col >= map[0].length) {
+            return false;
+        }
+
+        int tileId = map[row][col];
+        Tile tile = tiles[tileId];
+        if (!tile.destructible || tile.hitPoints <= 0) {
+            return false;
+        }
+
+        tileDamage[row][col] += damage;
+        if (tileDamage[row][col] < tile.hitPoints) {
+            return false;
+        }
+
+        map[row][col] = getDestroyedReplacementTileId();
+        tileDamage[row][col] = 0;
+        return true;
+    }
+
+    public int damageTilesInRadius(double centerX, double centerY, double radius, int damage) {
+        if (damage <= 0 || radius <= 0) {
+            return 0;
+        }
+
+        int minCol = Math.max(0, (int) ((centerX - radius) / gp.tileSize));
+        int maxCol = Math.min(map[0].length - 1, (int) ((centerX + radius) / gp.tileSize));
+        int minRow = Math.max(0, (int) ((centerY - radius) / gp.tileSize));
+        int maxRow = Math.min(map.length - 1, (int) ((centerY + radius) / gp.tileSize));
+
+        double radiusSq = radius * radius;
+        int destroyed = 0;
+
+        for (int row = minRow; row <= maxRow; row++) {
+            for (int col = minCol; col <= maxCol; col++) {
+                double tileCenterX = col * gp.tileSize + gp.tileSize / 2.0;
+                double tileCenterY = row * gp.tileSize + gp.tileSize / 2.0;
+                double dx = tileCenterX - centerX;
+                double dy = tileCenterY - centerY;
+                if (dx * dx + dy * dy <= radiusSq && damageTileAtPixel(tileCenterX, tileCenterY, damage)) {
+                    destroyed++;
+                }
+            }
+        }
+
+        return destroyed;
+    }
+
+    private int getDestroyedReplacementTileId() {
+        return switch (currentMapType) {
+            case CITY, DENSE_FOREST, NIGHT_BLACKOUT -> 2;
+            case DESERT_OUTPOST, DESERT_TACTICAL -> 7;
+        };
     }
 
     public int getMapCols() {

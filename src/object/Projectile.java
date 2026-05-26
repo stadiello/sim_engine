@@ -69,6 +69,15 @@ public class Projectile extends GameObject {
         y += vy;
 
         if (!canMoveTo(x, y, 2)) {
+            TileManager tileManager = ObjectManager.getTileManager();
+            if (tileManager != null) {
+                int tileDamage = switch (type) {
+                    case BULLET -> 1;
+                    case SHOTGUN_PELLET -> 1;
+                    default -> 1;
+                };
+                tileManager.damageTileAtPixel(x, y, tileDamage);
+            }
             ObjectManager.list.remove(this);
             ObjectManager.list.add(new ImpactSpark(x, y));
             return;
@@ -109,6 +118,12 @@ public class Projectile extends GameObject {
             }
 
             if (distSq < hitRadiusSq) {
+                if (homme instanceof Ennemi ennemi && ennemi.absorbFrontHit(vx, vy)) {
+                    ObjectManager.list.add(new ImpactSpark(x, y));
+                    ObjectManager.list.remove(this);
+                    return;
+                }
+
                 ObjectManager.list.remove(homme);
                 homme.onDeath();
                 ObjectManager.list.add(new ImpactSpark(x, y));
@@ -172,6 +187,11 @@ public class Projectile extends GameObject {
 
     private void explode() {
         Utils.playGrenadeSound();
+
+        TileManager tileManager = ObjectManager.getTileManager();
+        if (tileManager != null) {
+            tileManager.damageTilesInRadius(x, y, GRENADE_BLAST_RADIUS, 2);
+        }
 
         for (int i = 0; i < GRENADE_SPARK_COUNT; i++) {
             ObjectManager.list.add(new ImpactSpark(x, y));

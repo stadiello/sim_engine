@@ -3,11 +3,15 @@ package main;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.KeyboardFocusManager;
+import java.awt.geom.Path2D;
+import java.awt.image.BufferedImage;
 
 import gameController.GameKeyController;
+import object.GameObject;
 import object.ai.AiTuning;
 import object.Alien;
 import object.Ennemi;
+import object.Ennemi.EnemyArchetype;
 import object.Homme;
 import object.Protagonist;
 import object.Soldat;
@@ -24,7 +28,8 @@ public class GamePanel extends JPanel implements Runnable {
         MENU,
         OPTIONS,
         PLAYING,
-        GAME_OVER
+        GAME_OVER,
+        VICTORY
     }
 
     private int nombreCivil = 5;
@@ -41,11 +46,19 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int AI_OPTION_ROW_GAP = 34;
     private static final int AI_OPTION_COUNT = 8;
     private static final int MENU_MAP_CARD_GAP = 26;
+    private static final float NIGHT_DARKNESS_ALPHA = 0.86f;
+    private static final double PLAYER_FLASHLIGHT_RANGE = 320;
+    private static final double PLAYER_FLASHLIGHT_HALF_ANGLE = Math.toRadians(35);
+    private static final double ENEMY_FLASHLIGHT_RANGE = 230;
+    private static final double ENEMY_FLASHLIGHT_HALF_ANGLE = Math.toRadians(25);
+    private static final double EXTRACTION_MARGIN_TILES = 1.5;
+    private static final double FLASHLIGHT_RAY_STEP = 8.0;
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
+    private String gameOverTitle = "VOUS ETES MORT";
 
     public static int score = 0;
 
@@ -62,9 +75,17 @@ public class GamePanel extends JPanel implements Runnable {
     private void initializeWorld() {
         ObjectManager.list.clear();
         score = 0;
+        gameOverTitle = "VOUS ETES MORT";
+
+        int civilsToSpawn = nombreCivil;
+        int soldatsToSpawn = nombreSoldat;
+        if (GameMode.current == GameMode.PROTECTION) {
+            civilsToSpawn = Math.max(4, nombreCivil);
+            soldatsToSpawn = Math.max(1, nombreSoldat);
+        }
 
         // Cree une petite population initiale.
-        for (int i = 0; i < nombreCivil; i++) {
+        for (int i = 0; i < civilsToSpawn; i++) {
             double[] spawn = getFreeSpawnPosition();
             ObjectManager.list.add(new Homme(spawn[0], spawn[1]));
         }
@@ -74,7 +95,7 @@ public class GamePanel extends JPanel implements Runnable {
         ObjectManager.list.add(new Protagonist(protagonistSpawn[0], protagonistSpawn[1], keyController));
 
         // Garde les soldats alliés près du protagoniste dans la même zone sécurisée.
-        for (int i = 0; i < nombreSoldat; i++) {
+        for (int i = 0; i < soldatsToSpawn; i++) {
             double[] soldatSpawn = getFreeSpawnPositionInZone(
                 5,
                 Math.min(8, tileManager.getMapCols() - 2),
@@ -105,8 +126,26 @@ public class GamePanel extends JPanel implements Runnable {
                     protagonistSpawnY,
                     SAFE_HOSTILE_SPAWN_DISTANCE
             );
-            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1]));
+            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], chooseEnemyArchetype(i, nombreEnnemi)));
         }
+    }
+
+    private EnemyArchetype chooseEnemyArchetype(int index, int total) {
+        if (total <= 2) {
+            return EnemyArchetype.STANDARD;
+        }
+
+        double ratio = total > 1 ? index / (double) (total - 1) : 0.0;
+        if (ratio < 0.58) {
+            return EnemyArchetype.STANDARD;
+        }
+        if (ratio < 0.85) {
+            return EnemyArchetype.FLANQUEUR;
+        }
+        if (ratio < 0.94) {
+            return EnemyArchetype.ASSAUT;
+        }
+        return EnemyArchetype.LOURD;
     }
 
     private int[][] buildEnemySpawnZones() {
@@ -348,10 +387,31 @@ public class GamePanel extends JPanel implements Runnable {
         if (screenState == ScreenState.PLAYING && !paused) {
             applySoldierMoveCommand();
             ObjectManager.updateAll();
-            if (ObjectManager.getProtagonist() == null) {
+            Protagonist protagonist = ObjectManager.getProtagonist();
+            if (protagonist == null) {
+                gameOverTitle = "VOUS ETES MORT";
                 screenState = ScreenState.GAME_OVER;
                 paused = false;
+                return;
             }
+
+            if (GameMode.current == GameMode.PROTECTION) {
+                int[] counts = ObjectManager.getUiCounts();
+                int alliesAlive = counts[0] + counts[1];
+                if (alliesAlive <= 0) {
+                    gameOverTitle = "MISSION ECHOUEE";
+                    screenState = ScreenState.GAME_OVER;
+                    paused = false;
+                    return;
+                }
+
+                if (protagonist.x >= getExtractionX()) {
+                    screenState = ScreenState.VICTORY;
+                    paused = false;
+                    return;
+                }
+            }
+
             updateCamera();
         }
     }
@@ -391,6 +451,11 @@ public class GamePanel extends JPanel implements Runnable {
                 initializeWorld();
                 screenState = ScreenState.PLAYING;
                 paused = false;
+            } else if (getProtectionModeButtonBounds().contains(mouseX, mouseY)) {
+                GameMode.current = GameMode.PROTECTION;
+                initializeWorld();
+                screenState = ScreenState.PLAYING;
+                paused = false;
             } else if (getOptionsButtonBounds().contains(mouseX, mouseY)) {
                 screenState = ScreenState.OPTIONS;
             }
@@ -408,7 +473,8 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
 
-        if (screenState == ScreenState.GAME_OVER && getReplayButtonBounds().contains(mouseX, mouseY)) {
+        if ((screenState == ScreenState.GAME_OVER || screenState == ScreenState.VICTORY)
+                && getReplayButtonBounds().contains(mouseX, mouseY)) {
             initializeWorld();
             screenState = ScreenState.PLAYING;
             paused = false;
@@ -440,9 +506,14 @@ public class GamePanel extends JPanel implements Runnable {
         return new Rectangle(free.x, free.y + 62, free.width, free.height);
     }
 
-    private Rectangle getOptionsButtonBounds() {
+    private Rectangle getProtectionModeButtonBounds() {
         Rectangle story = getStoryModeButtonBounds();
         return new Rectangle(story.x, story.y + 62, story.width, story.height);
+    }
+
+    private Rectangle getOptionsButtonBounds() {
+        Rectangle protection = getProtectionModeButtonBounds();
+        return new Rectangle(protection.x, protection.y + 62, protection.width, protection.height);
     }
 
     private Rectangle getMapCardBounds(int index, int total) {
@@ -574,19 +645,175 @@ public class GamePanel extends JPanel implements Runnable {
         tileManager.centerCameraOn(protagonist.x, protagonist.y, viewWidth, viewHeight);
     }
 
+    private double getExtractionX() {
+        return tileManager.getWorldWidth() - tileSize * EXTRACTION_MARGIN_TILES;
+    }
+
+    private void drawExtractionZone(Graphics2D g2d) {
+        if (GameMode.current != GameMode.PROTECTION || screenState != ScreenState.PLAYING) {
+            return;
+        }
+
+        int zoneX = (int) Math.round(getExtractionX());
+        int zoneWidth = (int) Math.round(tileSize * 1.5);
+        int zoneHeight = (int) Math.round(tileManager.getWorldHeight());
+
+        g2d.setColor(new Color(90, 210, 110, 70));
+        g2d.fillRect(zoneX, 0, zoneWidth, zoneHeight);
+        g2d.setColor(new Color(170, 255, 190, 180));
+        g2d.drawRect(zoneX, 0, zoneWidth, zoneHeight);
+        g2d.drawString("EXTRACTION", zoneX + 8, 22);
+    }
+
+    private boolean isNightMap() {
+        return tileManager.getCurrentMapType() == MapType.NIGHT_BLACKOUT;
+    }
+
+    private void drawNightOverlay(Graphics2D g2d) {
+        if (!isNightMap() || screenState != ScreenState.PLAYING) {
+            return;
+        }
+
+        int viewWidth = getWidth() > 0 ? getWidth() : 800;
+        int viewHeight = getHeight() > 0 ? getHeight() : 600;
+
+        BufferedImage darkness = new BufferedImage(viewWidth, viewHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D darknessG = darkness.createGraphics();
+        darknessG.setColor(new Color(0f, 0f, 0f, NIGHT_DARKNESS_ALPHA));
+        darknessG.fillRect(0, 0, viewWidth, viewHeight);
+
+        darknessG.setComposite(AlphaComposite.Clear);
+
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist != null) {
+            drawFlashlightCone(
+                    darknessG,
+                    protagonist.x,
+                    protagonist.y,
+                    protagonist.getFacingX(),
+                    protagonist.getFacingY(),
+                    PLAYER_FLASHLIGHT_RANGE,
+                    PLAYER_FLASHLIGHT_HALF_ANGLE,
+                    42
+            );
+        }
+
+        for (GameObject obj : ObjectManager.list) {
+            if (obj instanceof Ennemi ennemi) {
+                drawFlashlightCone(
+                        darknessG,
+                        ennemi.x,
+                        ennemi.y,
+                        ennemi.getFacingX(),
+                        ennemi.getFacingY(),
+                        ENEMY_FLASHLIGHT_RANGE,
+                        ENEMY_FLASHLIGHT_HALF_ANGLE,
+                        20
+                );
+            } else if (obj instanceof Alien alien) {
+                drawFlashlightCone(
+                        darknessG,
+                        alien.x,
+                        alien.y,
+                        alien.vx,
+                        alien.vy,
+                        ENEMY_FLASHLIGHT_RANGE * 0.85,
+                        ENEMY_FLASHLIGHT_HALF_ANGLE,
+                        16
+                );
+            }
+        }
+
+        darknessG.dispose();
+        g2d.drawImage(darkness, 0, 0, null);
+    }
+
+    private void drawFlashlightCone(
+            Graphics2D g2d,
+            double worldX,
+            double worldY,
+            double dirX,
+            double dirY,
+            double range,
+            double halfAngle,
+            int rays
+    ) {
+        double lenSq = dirX * dirX + dirY * dirY;
+        if (lenSq <= 0.00001) {
+            dirX = 0;
+            dirY = -1;
+            lenSq = 1;
+        }
+
+        double invLen = 1.0 / Math.sqrt(lenSq);
+        dirX *= invLen;
+        dirY *= invLen;
+
+        double baseAngle = Math.atan2(dirY, dirX);
+        int cameraX = tileManager.getCameraX();
+        int cameraY = tileManager.getCameraY();
+        double screenX = worldX - cameraX;
+        double screenY = worldY - cameraY;
+
+        Path2D.Double cone = new Path2D.Double();
+        cone.moveTo(screenX, screenY);
+        for (int i = 0; i <= rays; i++) {
+            double t = i / (double) rays;
+            double angle = baseAngle - halfAngle + t * halfAngle * 2.0;
+            double rayDirX = Math.cos(angle);
+            double rayDirY = Math.sin(angle);
+            double hitDistance = range;
+
+            for (double rayDistance = FLASHLIGHT_RAY_STEP; rayDistance <= range; rayDistance += FLASHLIGHT_RAY_STEP) {
+                double sampleWorldX = worldX + rayDirX * rayDistance;
+                double sampleWorldY = worldY + rayDirY * rayDistance;
+                if (tileManager.isBlockedAtPixel(sampleWorldX, sampleWorldY)) {
+                    hitDistance = Math.max(FLASHLIGHT_RAY_STEP, rayDistance - FLASHLIGHT_RAY_STEP * 0.55);
+                    break;
+                }
+            }
+
+            double px = screenX + rayDirX * hitDistance;
+            double py = screenY + rayDirY * hitDistance;
+            cone.lineTo(px, py);
+        }
+        cone.closePath();
+        g2d.fill(cone);
+
+        int centerRadius = 40;
+        g2d.fillOval(
+                (int) Math.round(screenX - centerRadius),
+                (int) Math.round(screenY - centerRadius),
+                centerRadius * 2,
+                centerRadius * 2
+        );
+    }
+
     private void drawUI(Graphics g) {
         // Affiche le compteur des entites encore en vie.
         int[] counts = ObjectManager.getUiCounts();
         int civils = counts[0];
         int soldats = counts[1];
         int aliens = counts[2];
+        int initialAllies = Math.max(1, nombreCivil + nombreSoldat);
 
         g.setColor(Color.WHITE);
         g.drawString("Civils: " + civils, 10, 20);
         g.drawString("Soldats: " + soldats, 10, 40);
         g.drawString("Aliens: " + aliens, 10, 60);
-        g.drawString("Casualties: " + (8 - civils - soldats), 10, 80);
+        g.drawString("Casualties: " + Math.max(0, initialAllies - civils - soldats), 10, 80);
         g.drawString("P: Pause", 10, 100);
+
+        if (GameMode.current == GameMode.PROTECTION) {
+            Protagonist protagonist = ObjectManager.getProtagonist();
+            if (protagonist != null) {
+                double distanceToExtraction = Math.max(0, getExtractionX() - protagonist.x);
+                g.setColor(new Color(255, 231, 133));
+                g.drawString("Protection: escorte jusqu'a la zone d'extraction", 10, 125);
+                g.drawString("Distance extraction: " + (int) Math.round(distanceToExtraction) + " px", 10, 145);
+                g.drawString("Allies a proteger: " + (civils + soldats), 10, 165);
+            }
+        }
     }
 
     private void drawButton(Graphics2D g2d, Rectangle rect, String label) {
@@ -672,6 +899,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
         drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
+        drawButton(g2d, getProtectionModeButtonBounds(), "Mode Protection");
         drawButton(g2d, getOptionsButtonBounds(), "Options");
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 16f));
@@ -748,9 +976,33 @@ public class GamePanel extends JPanel implements Runnable {
         Font oldFont = g2d.getFont();
         g2d.setColor(new Color(255, 80, 80));
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 54f));
-        String title = "VOUS ETES MORT";
+        String title = gameOverTitle;
         FontMetrics titleFm = g2d.getFontMetrics();
         g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, panelHeight / 2 - 40);
+
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 22f));
+        String scoreText = "Score final : " + score;
+        FontMetrics scoreFm = g2d.getFontMetrics();
+        g2d.drawString(scoreText, (panelWidth - scoreFm.stringWidth(scoreText)) / 2, panelHeight / 2);
+
+        drawButton(g2d, getReplayButtonBounds(), "Rejouer");
+        g2d.setFont(oldFont);
+    }
+
+    private void drawVictoryOverlay(Graphics2D g2d) {
+        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+
+        g2d.setColor(new Color(0, 0, 0, 165));
+        g2d.fillRect(0, 0, panelWidth, panelHeight);
+
+        Font oldFont = g2d.getFont();
+        g2d.setColor(new Color(120, 255, 160));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 52f));
+        String title = "MISSION REUSSIE";
+        FontMetrics titleFm = g2d.getFontMetrics();
+        g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, panelHeight / 2 - 44);
 
         g2d.setColor(Color.WHITE);
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 22f));
@@ -768,8 +1020,11 @@ public class GamePanel extends JPanel implements Runnable {
         var old = g2d.getTransform();
         g2d.translate(-tileManager.getCameraX(), -tileManager.getCameraY());
         tileManager.draw(g2d);
+        drawExtractionZone(g2d);
         ObjectManager.drawAll(g2d);
         g2d.setTransform(old);
+
+        drawNightOverlay(g2d);
 
         if (screenState == ScreenState.PLAYING) {
             drawUI(g);
@@ -778,6 +1033,8 @@ public class GamePanel extends JPanel implements Runnable {
             }
         } else if (screenState == ScreenState.GAME_OVER) {
             drawGameOverOverlay(g2d);
+        } else if (screenState == ScreenState.VICTORY) {
+            drawVictoryOverlay(g2d);
         } else if (screenState == ScreenState.MENU) {
             drawMenu(g2d);
         } else if (screenState == ScreenState.OPTIONS) {

@@ -2,6 +2,7 @@ package object.weapon;
 
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Color;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
@@ -97,6 +98,21 @@ public final class Weapon {
             false,
             FireSound.NONE);
 
+    private static final Weapon MINIGUN = new Weapon(
+            "Minigun",
+            "/assets/armes/minigun.png",
+            Projectile.ProjectileType.BULLET,
+            2,
+            24,
+            10,
+            34,
+            -26,
+            12,
+            14,
+            true,
+            true,
+            FireSound.SMG);
+
     public static Weapon blaster() {
         return BLASTER;
     }
@@ -115,6 +131,10 @@ public final class Weapon {
 
     public static Weapon grenade() {
         return GRENADE;
+    }
+
+    public static Weapon minigun() {
+        return MINIGUN;
     }
 
     public static Weapon[] protagonistLoadout() {
@@ -192,7 +212,14 @@ public final class Weapon {
         return projectileSpeed >= 25.0;
     }
 
+    public boolean isMinigun() {
+        return "Minigun".equals(name);
+    }
+
     public double getAiOptimalRange() {
+        if (isMinigun()) {
+            return 255.0;
+        }
         if (isShotgun()) {
             return 120.0;
         }
@@ -256,12 +283,27 @@ public final class Weapon {
     }
 
     public void draw(Graphics2D g2d, double x, double y, int timer, boolean shot) {
-        if (sprite == null) {
+        if (sprite == null && !isMinigun()) {
             return;
         }
 
         int offsetArme = shot ? (int) (Math.sin(timer * 0.15) * recoilAmplitude) : 0;
-        g2d.drawImage(sprite, (int) x + drawOffsetX, (int) y + drawOffsetY + offsetArme, drawWidth, drawHeight, null);
+        if (sprite != null) {
+            g2d.drawImage(sprite, (int) x + drawOffsetX, (int) y + drawOffsetY + offsetArme, drawWidth, drawHeight, null);
+            return;
+        }
+
+        // Fallback visuel si l'asset minigun est absent.
+        int baseX = (int) x + drawOffsetX;
+        int baseY = (int) y + drawOffsetY + offsetArme;
+        g2d.setColor(new Color(36, 42, 48));
+        g2d.fillRoundRect(baseX, baseY, drawWidth, drawHeight, 4, 4);
+        g2d.setColor(new Color(88, 99, 112));
+        g2d.fillRect(baseX + 3, baseY + 4, drawWidth - 5, drawHeight - 12);
+        g2d.setColor(new Color(122, 132, 144));
+        g2d.fillRect(baseX + drawWidth - 3, baseY + 6, 8, 16);
+        g2d.setColor(new Color(24, 26, 30));
+        g2d.fillRect(baseX - 2, baseY + drawHeight - 8, 6, 10);
     }
 
     private void playSound() {

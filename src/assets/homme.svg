@@ -31,8 +31,8 @@
      inkscape:cy="4911.0236"
      inkscape:window-width="1512"
      inkscape:window-height="771"
-     inkscape:window-x="0"
-     inkscape:window-y="30"
+     inkscape:window-x="170"
+     inkscape:window-y="1113"
      inkscape:window-maximized="0"
      inkscape:current-layer="layer2" />
   <defs
@@ -570,5 +570,27 @@
        transform="scale(0.26458333)"
        id="text17"
        style="fill:#000000;text-orientation:auto;stroke:#28220b;stroke-width:7.04881899;writing-mode:lr-tb;direction:ltr;opacity:1;fill-opacity:0.9619565;white-space:pre;shape-inside:url(#rect17);stroke-dasharray:none" />
+    <path
+       style="fill:#008000;fill-opacity:0.961956;stroke-width:1.865"
+       id="path8"
+       sodipodi:type="arc"
+       sodipodi:cx="2064.7212"
+       sodipodi:cy="1205.1345"
+       sodipodi:rx="59.971153"
+       sodipodi:ry="105.66346"
+       sodipodi:start="0"
+       sodipodi:end="6.240696"
+       sodipodi:arc-type="slice"
+       d="m 2124.6923,1205.1345 a 59.971153,105.66346 0 0 1 -59.3341,105.6575 59.971153,105.66346 0 0 1 -60.5946,-103.4129 59.971153,105.66346 0 0 1 58.0468,-107.8544 59.971153,105.66346 0 0 1 61.8278,101.1216 l -59.917,4.4882 z"
+       inkscape:export-filename="armes/grenade.png"
+       inkscape:export-xdpi="96"
+       inkscape:export-ydpi="96" />
+    <rect
+       style="fill:#a05a2c;fill-opacity:0.961956;stroke-width:1.865"
+       id="rect10"
+       width="65.682693"
+       height="59.971153"
+       x="2056.1538"
+       y="1062.3462" />
   </g>
 </svg>

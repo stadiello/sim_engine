@@ -131,17 +131,58 @@ public class TileGenerator {
         BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
 
-        // Fond herbe
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Base herbe, proche du tile de pelouse pour garder une palette cohérente.
         g.setColor(new Color(76, 140, 50));
         g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-        // Tronc
-        g.setColor(new Color(101, 67, 33));
-        g.fillRect(20, 30, 10, 20);
+        Random rand = new Random(11);
+        g.setColor(new Color(60, 110, 40));
+        for (int i = 0; i < 12; i++) {
+            int x = rand.nextInt(TILE_SIZE);
+            int y = rand.nextInt(TILE_SIZE);
+            g.fillOval(x, y, 3 + rand.nextInt(6), 3 + rand.nextInt(6));
+        }
 
-        // Feuillage
-        g.setColor(new Color(34, 100, 25));
-        g.fillOval(10, 10, 30, 25);
+        // Ombre portée du feuillage pour mieux asseoir l'arbre sur le sol.
+        g.setColor(new Color(46, 85, 36));
+        g.fillOval(12, 30, 27, 11);
+
+        // Tronc avec légère variation verticale.
+        GradientPaint trunkGradient = new GradientPaint(
+                0, 20, new Color(124, 83, 45),
+                0, 47, new Color(86, 55, 30)
+        );
+        g.setPaint(trunkGradient);
+        g.fillRoundRect(21, 23, 8, 24, 3, 3);
+
+        g.setColor(new Color(150, 102, 58));
+        g.drawLine(23, 26, 23, 43);
+        g.drawLine(26, 28, 26, 44);
+
+        // Feuillage en plusieurs masses pour casser l'effet "ovale unique".
+        g.setColor(new Color(38, 116, 45));
+        g.fillOval(10, 10, 18, 16);
+        g.fillOval(22, 9, 17, 16);
+        g.fillOval(14, 4, 22, 18);
+
+        g.setColor(new Color(24, 90, 34));
+        g.fillOval(12, 15, 13, 11);
+        g.fillOval(26, 14, 11, 11);
+
+        g.setColor(new Color(68, 150, 67));
+        for (int i = 0; i < 6; i++) {
+            int x = 14 + rand.nextInt(20);
+            int y = 7 + rand.nextInt(15);
+            g.fillOval(x, y, 3, 3);
+        }
+
+        // Contour léger pour garder la lisibilité sur différents fonds.
+        g.setColor(new Color(20, 75, 30));
+        g.drawOval(10, 10, 18, 16);
+        g.drawOval(22, 9, 17, 16);
+        g.drawOval(14, 4, 22, 18);
 
         g.dispose();
         return img;

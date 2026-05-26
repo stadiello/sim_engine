@@ -46,7 +46,7 @@ public class Protagonist extends Homme{
     public Protagonist(double x, double y, GameKeyController keyController) {
         super(x, y);
         this.keyController = keyController;
-        Weapon[] initial = GameMode.current == GameMode.STORY
+        Weapon[] initial = (GameMode.current == GameMode.STORY || GameMode.current == GameMode.PROTECTION)
                 ? Weapon.storyLoadout()
                 : Weapon.protagonistLoadout();
         this.loadout = new ArrayList<>();
@@ -254,6 +254,14 @@ public class Protagonist extends Homme{
         shot = false;
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
     
+    }
+
+    public double getFacingX() {
+        return facingX;
+    }
+
+    public double getFacingY() {
+        return facingY;
     }
 
 }

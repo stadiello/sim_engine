@@ -23,6 +23,10 @@ public class BotBrain {
     private static final int SUPPRESSIVE_FIRE_MAX_FRAMES = 24;
     private static final int SUPPRESSIVE_REARM_MIN_FRAMES = 90;
     private static final int SUPPRESSIVE_REARM_MAX_FRAMES = 170;
+    private static final int FLANK_MEMORY_FRAMES = 46;
+    private static final double FLANK_MIN_RANGE = 120.0;
+    private static final double FLANK_SIDE_OFFSET = 132.0;
+    private static final double FLANK_BACK_OFFSET = 56.0;
 
     private int shootCooldown = 0;
     private int losCheckCooldown = 0;
@@ -40,6 +44,10 @@ public class BotBrain {
     private int burstPauseTimer = 0;
     private int suppressiveFireTimer = 0;
     private int suppressiveRearminTimer = 0;
+    private int flankMemoryTimer = 0;
+    private double flankX;
+    private double flankY;
+    private int flankDirectionSign = 0;
 
     public void update(Ennemi enemy) {
         enemy.tickSuppression();
@@ -62,6 +70,7 @@ public class BotBrain {
             applySmoothedVelocity(enemy, 0, 0);
             focusedTarget = null;
             clearCover();
+            clearFlank();
             return;
         }
 
@@ -73,6 +82,7 @@ public class BotBrain {
             burstPauseTimer = 0;
             suppressiveFireTimer = 0;
             suppressiveRearminTimer = 0;
+            clearFlank();
         }
 
         double dx = target.x - enemy.x;
@@ -81,6 +91,7 @@ public class BotBrain {
         if (distSq <= EPSILON_DIST_SQ) {
             applySmoothedVelocity(enemy, 0, 0);
             clearCover();
+            clearFlank();
             return;
         }
 
@@ -108,16 +119,20 @@ public class BotBrain {
             }
         } else {
             aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+            double suppressiveChance = enemy.isHeavy() ? 0.075 : enemy.isBreacher() ? 0.055 : enemy.isFlanker() ? 0.030 : 0.035;
             if (suppressionStage <= 2
                     && dist <= engageRange * 1.1
                     && suppressiveFireTimer <= 0
                     && suppressiveRearminTimer <= 0
-                    && Math.random() < 0.035) {
+                    && Math.random() < suppressiveChance) {
                 suppressiveFireTimer = Math.max(
                         suppressiveFireTimer,
                         SUPPRESSIVE_FIRE_MIN_FRAMES + (int) (Math.random() * (SUPPRESSIVE_FIRE_MAX_FRAMES - SUPPRESSIVE_FIRE_MIN_FRAMES + 1))
                 );
-                suppressiveRearminTimer = SUPPRESSIVE_REARM_MIN_FRAMES
+                int rearminBase = enemy.isHeavy()
+                    ? SUPPRESSIVE_REARM_MIN_FRAMES - 35
+                    : enemy.isBreacher() ? SUPPRESSIVE_REARM_MIN_FRAMES - 18 : SUPPRESSIVE_REARM_MIN_FRAMES;
+                suppressiveRearminTimer = Math.max(42, rearminBase)
                         + (int) (Math.random() * (SUPPRESSIVE_REARM_MAX_FRAMES - SUPPRESSIVE_REARM_MIN_FRAMES + 1));
             }
             if (suppressiveFireTimer > 0 && shootCooldown == 0 && burstPauseTimer == 0) {
@@ -125,8 +140,16 @@ public class BotBrain {
                 enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
                 enemy.onShot();
                 shootCooldown = Math.max(1, enemy.getCarriedWeapon().getCooldownFrames() - 1);
-                burstPauseTimer = BURST_PAUSE_MIN_FRAMES + 2 + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1));
+                int rolePauseDelta = enemy.isHeavy() ? -3 : enemy.isBreacher() ? -2 : 0;
+                burstPauseTimer = Math.max(
+                        1,
+                        BURST_PAUSE_MIN_FRAMES + 2 + rolePauseDelta + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1))
+                );
             }
+        }
+
+        if (enemy.isFlanker() && tryMoveToFlank(enemy, target, dist, engageRange, optimalRange, hasLineOfSight)) {
+            return;
         }
 
         if (shouldSeekCover(enemy, weapon, dist, hasLineOfSight, suppressionStage)) {
@@ -149,20 +172,27 @@ public class BotBrain {
         if (hasLineOfSight && dist <= engageRange) {
             applyCombatMovement(enemy, dx, dy, invDist, dist, retreatRange, optimalRange);
 
-            if (shootCooldown == 0 && aimSettleTimer <= 0 && canFireInCurrentBurst(enemy.getCarriedWeapon(), suppressionStage)) {
+            if (shootCooldown == 0 && aimSettleTimer <= 0 && canFireInCurrentBurst(enemy, enemy.getCarriedWeapon(), suppressionStage)) {
                 double[] shotDir = applyAimError(enemy, dx * invDist, dy * invDist, dist, suppressionStage, suppressionLevel);
                 enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
                 enemy.onShot();
                 shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
                 aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
-                consumeBurstShot(enemy.getCarriedWeapon(), suppressionStage);
+                consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
             }
             return;
         }
 
         clearCover();
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
         double pushFactor = weapon.isShotgun() ? AGGRESSIVE_PUSH_FACTOR : 1.0;
+        if (enemy.isHeavy()) {
+            pushFactor += 0.18;
+        } else if (enemy.isBreacher()) {
+            pushFactor += 0.10;
+        } else if (enemy.isFlanker()) {
+            pushFactor *= 0.95;
+        }
         double desiredVx = dx * invDist * moveSpeed * pushFactor;
         double desiredVy = dy * invDist * moveSpeed * pushFactor;
         double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, desiredVx, desiredVy, ENTITY_RADIUS);
@@ -194,17 +224,22 @@ public class BotBrain {
 
     private boolean shouldSeekCover(Ennemi enemy, Weapon weapon, double dist, boolean hasLineOfSight, int suppressionStage) {
         double suppressionBonus = enemy.isSuppressed() ? AiTuning.getSuppressionCoverBoost() * enemy.getSuppressionLevel() : 0.0;
+        double roleCoverBias = enemy.isHeavy() ? 0.52 : enemy.isBreacher() ? 0.62 : enemy.isFlanker() ? 0.88 : 1.0;
 
         if (!hasLineOfSight) {
             double chaseWindow = suppressionStage >= 2 ? 1.35 : 1.15;
-            return dist <= weapon.getAiEngageRange() * (chaseWindow + suppressionBonus * 0.4);
+            if (enemy.isFlanker() && flankMemoryTimer > 0) {
+                return false;
+            }
+            return dist <= weapon.getAiEngageRange() * (chaseWindow + suppressionBonus * 0.4 * roleCoverBias);
         }
 
         int cooldownFrames = Math.max(1, weapon.getCooldownFrames());
         double ratio = shootCooldown / (double) cooldownFrames;
         double threshold = Math.max(0.08, COVER_SEARCH_MIN_COOLDOWN_RATIO - suppressionBonus * 0.22 - suppressionStage * 0.06);
+        threshold += enemy.isHeavy() ? 0.30 : enemy.isBreacher() ? 0.20 : enemy.isFlanker() ? 0.08 : 0.0;
         double engageWindow = suppressionStage >= 3 ? weapon.getAiEngageRange() * 1.15 : weapon.getAiEngageRange();
-        return ratio >= threshold && dist <= engageWindow;
+        return ratio >= threshold && dist <= engageWindow * roleCoverBias;
     }
 
     private boolean moveToCover(Ennemi enemy, Homme target, double preferredRange) {
@@ -239,11 +274,126 @@ public class BotBrain {
         }
 
         double invCoverDist = 1.0 / Math.sqrt(coverDistSq);
-    double desiredVx = toCoverX * invCoverDist * moveSpeed;
-    double desiredVy = toCoverY * invCoverDist * moveSpeed;
+        double desiredVx = toCoverX * invCoverDist * moveSpeed;
+        double desiredVy = toCoverY * invCoverDist * moveSpeed;
         double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, desiredVx, desiredVy, ENTITY_RADIUS);
         applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
         enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
+        return true;
+    }
+
+    private boolean tryMoveToFlank(
+            Ennemi enemy,
+            Homme target,
+            double dist,
+            double engageRange,
+            double preferredRange,
+            boolean hasLineOfSight
+    ) {
+        if (dist < FLANK_MIN_RANGE || dist > engageRange * 1.35) {
+            clearFlank();
+            return false;
+        }
+
+        if (flankMemoryTimer <= 0 || !isFlankPointUsable(target, preferredRange)) {
+            if (!selectFlankPoint(enemy, target, preferredRange, hasLineOfSight)) {
+                clearFlank();
+                return false;
+            }
+        } else {
+            flankMemoryTimer--;
+        }
+
+        double toFlankX = flankX - enemy.x;
+        double toFlankY = flankY - enemy.y;
+        double flankDistSq = toFlankX * toFlankX + toFlankY * toFlankY;
+        if (flankDistSq <= 14.0 * 14.0) {
+            applySmoothedVelocity(enemy, 0, 0);
+            enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
+            return true;
+        }
+
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * 1.08;
+        double invDist = 1.0 / Math.sqrt(flankDistSq);
+        double desiredVx = toFlankX * invDist * moveSpeed;
+        double desiredVy = toFlankY * invDist * moveSpeed;
+        double[] adjusted = TacticalMovement.adjustForObstacles(enemy.x, enemy.y, desiredVx, desiredVy, ENTITY_RADIUS);
+        applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
+        enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
+        return true;
+    }
+
+    private boolean isFlankPointUsable(Homme target, double preferredRange) {
+        if (!TacticalMovement.canStandAt(flankX, flankY, ENTITY_RADIUS)) {
+            return false;
+        }
+
+        double distToTarget = Math.hypot(target.x - flankX, target.y - flankY);
+        return distToTarget >= preferredRange * 0.45 && distToTarget <= preferredRange * 1.50;
+    }
+
+    private boolean selectFlankPoint(Ennemi enemy, Homme target, double preferredRange, boolean hasLineOfSight) {
+        double toTargetX = target.x - enemy.x;
+        double toTargetY = target.y - enemy.y;
+        double toTargetLenSq = toTargetX * toTargetX + toTargetY * toTargetY;
+        if (toTargetLenSq <= EPSILON_DIST_SQ) {
+            return false;
+        }
+
+        double invLen = 1.0 / Math.sqrt(toTargetLenSq);
+        double dirX = toTargetX * invLen;
+        double dirY = toTargetY * invLen;
+        int preferredSide = flankDirectionSign == 0 ? (Math.random() < 0.5 ? -1 : 1) : flankDirectionSign;
+
+        double bestScore = Double.NEGATIVE_INFINITY;
+        double bestX = 0;
+        double bestY = 0;
+        int bestSide = 0;
+
+        int[] sideOrder = {preferredSide, -preferredSide};
+        for (int sideSign : sideOrder) {
+            double perpX = -dirY * sideSign;
+            double perpY = dirX * sideSign;
+
+            double candidateX = target.x + perpX * FLANK_SIDE_OFFSET - dirX * FLANK_BACK_OFFSET;
+            double candidateY = target.y + perpY * FLANK_SIDE_OFFSET - dirY * FLANK_BACK_OFFSET;
+
+            if (!TacticalMovement.canStandAt(candidateX, candidateY, ENTITY_RADIUS)) {
+                continue;
+            }
+            if (!ObjectManager.isHumanAreaFree(candidateX, candidateY, ENTITY_RADIUS, enemy)) {
+                continue;
+            }
+
+            double selfTravel = Math.hypot(candidateX - enemy.x, candidateY - enemy.y);
+            double distToTarget = Math.hypot(target.x - candidateX, target.y - candidateY);
+            double rangePenalty = Math.abs(distToTarget - preferredRange);
+            boolean hasFlankSight = TacticalMovement.hasLineOfSight(candidateX, candidateY, target.x, target.y);
+
+            double score = 1000.0 - selfTravel * 1.05 - rangePenalty * 0.90;
+            if (hasFlankSight) {
+                score += 150.0;
+            }
+            if (!hasLineOfSight) {
+                score += 65.0;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestX = candidateX;
+                bestY = candidateY;
+                bestSide = sideSign;
+            }
+        }
+
+        if (bestSide == 0) {
+            return false;
+        }
+
+        flankX = bestX;
+        flankY = bestY;
+        flankDirectionSign = bestSide;
+        flankMemoryTimer = FLANK_MEMORY_FRAMES;
         return true;
     }
 
@@ -258,12 +408,26 @@ public class BotBrain {
     ) {
         int suppressionStage = enemy.getSuppressionStage();
         double suppressionLevel = enemy.getSuppressionLevel();
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
 
         if (strafeSwitchTimer <= 0) {
-            strafeSign = Math.random() < 0.5 ? -1 : 1;
             int baseSwitch = suppressionStage >= 2 ? 16 : 24;
-            strafeSwitchTimer = baseSwitch + (int) (Math.random() * (suppressionStage >= 2 ? 16 : 24));
+            int variance = suppressionStage >= 2 ? 16 : 24;
+            if (enemy.isFlanker()) {
+                baseSwitch += 10;
+                variance += 8;
+            } else if (enemy.isHeavy()) {
+                baseSwitch = Math.max(14, baseSwitch - 8);
+                variance = Math.max(8, variance - 10);
+            } else if (enemy.isBreacher()) {
+                baseSwitch = Math.max(10, baseSwitch - 5);
+            }
+
+            if (!enemy.isFlanker() || Math.random() < 0.45) {
+                strafeSign = Math.random() < 0.5 ? -1 : 1;
+            }
+
+            strafeSwitchTimer = baseSwitch + (int) (Math.random() * Math.max(1, variance));
         } else {
             strafeSwitchTimer--;
         }
@@ -299,7 +463,15 @@ public class BotBrain {
             strafeFactor *= 1.10;
         }
 
-            strafeFactor *= 1.0 - 0.12 * suppressionLevel;
+        if (enemy.isFlanker()) {
+            forwardFactor += 0.12;
+            strafeFactor *= 1.42;
+        } else if (enemy.isBreacher()) {
+            forwardFactor += 0.22;
+            strafeFactor *= 0.62;
+        }
+
+        strafeFactor *= 1.0 - 0.12 * suppressionLevel;
         double perpX = -dirY * strafeSign;
         double perpY = dirX * strafeSign;
 
@@ -325,7 +497,7 @@ public class BotBrain {
         double sideSign = Math.random() < 0.5 ? -1 : 1;
         double perpX = -dirY * sideSign;
         double perpY = dirX * sideSign;
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * 0.85;
+        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy) * 0.85;
 
         double rawVx = (dirX * panicFactor + perpX * jitterFactor) * moveSpeed;
         double rawVy = (dirY * panicFactor + perpY * jitterFactor) * moveSpeed;
@@ -337,7 +509,24 @@ public class BotBrain {
         coverMemoryTimer = 0;
     }
 
-    private boolean canFireInCurrentBurst(Weapon weapon, int suppressionStage) {
+    private void clearFlank() {
+        flankMemoryTimer = 0;
+    }
+
+    private double getRoleSpeedMultiplier(Ennemi enemy) {
+        if (enemy.isFlanker()) {
+            return 1.16;
+        }
+        if (enemy.isHeavy()) {
+            return 0.62;
+        }
+        if (enemy.isBreacher()) {
+            return 1.08;
+        }
+        return 1.0;
+    }
+
+    private boolean canFireInCurrentBurst(Ennemi enemy, Weapon weapon, int suppressionStage) {
         if (burstPauseTimer > 0) {
             return false;
         }
@@ -345,12 +534,12 @@ public class BotBrain {
             return true;
         }
 
-        int burstSize = chooseBurstSize(weapon, suppressionStage);
+        int burstSize = chooseBurstSize(enemy, weapon, suppressionStage);
         burstShotsRemaining = Math.max(1, burstSize);
         return true;
     }
 
-    private void consumeBurstShot(Weapon weapon, int suppressionStage) {
+    private void consumeBurstShot(Ennemi enemy, Weapon weapon, int suppressionStage) {
         if (burstShotsRemaining > 0) {
             burstShotsRemaining--;
         }
@@ -362,10 +551,17 @@ public class BotBrain {
             if (suppressionStage >= 2) {
                 burstPauseTimer += 2;
             }
+            if (enemy.isHeavy()) {
+                burstPauseTimer = Math.max(1, burstPauseTimer - 3);
+            } else if (enemy.isBreacher()) {
+                burstPauseTimer = Math.max(1, burstPauseTimer - 2);
+            } else if (enemy.isFlanker()) {
+                burstPauseTimer += 1;
+            }
         }
     }
 
-    private int chooseBurstSize(Weapon weapon, int suppressionStage) {
+    private int chooseBurstSize(Ennemi enemy, Weapon weapon, int suppressionStage) {
         int minBurst;
         int maxBurst;
 
@@ -381,6 +577,15 @@ public class BotBrain {
         }
 
         if (suppressionStage >= 2) {
+            maxBurst = Math.max(minBurst, maxBurst - 1);
+        }
+
+        if (enemy.isHeavy()) {
+            minBurst += 1;
+            maxBurst += 2;
+        } else if (enemy.isBreacher()) {
+            maxBurst += 1;
+        } else if (enemy.isFlanker() && weapon.isAutomatic()) {
             maxBurst = Math.max(minBurst, maxBurst - 1);
         }
 
