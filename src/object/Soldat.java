@@ -24,6 +24,7 @@ public class Soldat extends Homme {
     private static final int SUPPRESSIVE_FIRE_MAX_FRAMES = 22;
     private static final int SUPPRESSIVE_REARM_MIN_FRAMES = 85;
     private static final int SUPPRESSIVE_REARM_MAX_FRAMES = 155;
+    private static final int MAX_ARMOR_PLATES = 2;
     private static Image imgCorps;
     private int shotAnimTimer = 0;
 
@@ -52,6 +53,7 @@ public class Soldat extends Homme {
     private int burstPauseTimer = 0;
     private int suppressiveFireTimer = 0;
     private int suppressiveRearminTimer = 0;
+    private int armorPlates = 0;
 
 
     static {
@@ -88,6 +90,26 @@ public class Soldat extends Homme {
         destinationY = targetY;
         hasDestination = true;
         commandMovePriorityFrames = 120;
+    }
+
+    public boolean addArmorPlate() {
+        if (armorPlates >= MAX_ARMOR_PLATES) {
+            return false;
+        }
+        armorPlates++;
+        return true;
+    }
+
+    public boolean consumeArmorPlateOnHit() {
+        if (armorPlates <= 0) {
+            return false;
+        }
+        armorPlates--;
+        return true;
+    }
+
+    public int getArmorPlates() {
+        return armorPlates;
     }
 
     @Override

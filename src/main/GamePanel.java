@@ -10,6 +10,7 @@ import gameController.GameKeyController;
 import object.GameObject;
 import object.ai.AiTuning;
 import object.Alien;
+import object.AlienTeleport;
 import object.Ennemi;
 import object.Ennemi.EnemyArchetype;
 import object.Homme;
@@ -45,9 +46,10 @@ public class GamePanel extends JPanel implements Runnable {
     private static final double ENTITY_RADIUS = 14;
     private static final int MAX_SPAWN_ATTEMPTS = 300;
     private static final double SAFE_HOSTILE_SPAWN_DISTANCE = 520;
+    private static final int ALIEN_RESPAWN_COOLDOWN_FRAMES = TARGET_UPS * 2;
     private static final int AI_OPTIONS_BASE_Y = 292;
     private static final int AI_OPTION_ROW_GAP = 34;
-    private static final int AI_OPTION_COUNT = 8;
+    private static final int AI_OPTION_COUNT = 9;
     private static final int MENU_MAP_CARD_GAP = 26;
     private static final float NIGHT_DARKNESS_ALPHA = 0.86f;
     private static final double PLAYER_FLASHLIGHT_RANGE = 320;
@@ -71,6 +73,7 @@ public class GamePanel extends JPanel implements Runnable {
     private int screenFlashFrames = 0;
     private Color screenFlashColor = new Color(255, 236, 160);
     private float screenFlashAlpha = 0f;
+    private int alienRespawnCooldownFrames = 0;
 
     public static int score = 0;
 
@@ -129,7 +132,7 @@ public class GamePanel extends JPanel implements Runnable {
                     protagonistSpawnY,
                     SAFE_HOSTILE_SPAWN_DISTANCE
             );
-            ObjectManager.list.add(new Alien(spawn[0], spawn[1]));
+            ObjectManager.list.add(new AlienTeleport(spawn[0], spawn[1]));
         }
 
         int enemyCount = GameMode.current == GameMode.ARCADE ? Math.max(8, nombreEnnemi - 1) : nombreEnnemi;
@@ -158,6 +161,7 @@ public class GamePanel extends JPanel implements Runnable {
         screenFlashFrames = 0;
         screenFlashAlpha = 0f;
         screenFlashColor = new Color(255, 236, 160);
+        alienRespawnCooldownFrames = 0;
     }
 
     private EnemyArchetype chooseEnemyArchetype(int index, int total) {
@@ -419,6 +423,7 @@ public class GamePanel extends JPanel implements Runnable {
         if (screenState == ScreenState.PLAYING && !paused) {
             applySoldierMoveCommand();
             ObjectManager.updateAll();
+            maintainAlienPresence();
             updateArcadeMode();
             Protagonist protagonist = ObjectManager.getProtagonist();
             if (protagonist == null) {
@@ -447,6 +452,32 @@ public class GamePanel extends JPanel implements Runnable {
 
             updateCamera();
         }
+    }
+
+    private void maintainAlienPresence() {
+        if (alienRespawnCooldownFrames > 0) {
+            alienRespawnCooldownFrames--;
+            return;
+        }
+
+        int aliveAliens = ObjectManager.getUiCounts()[2];
+        int desiredAliens = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien) : Math.max(1, nombreAlien);
+        if (aliveAliens >= desiredAliens) {
+            return;
+        }
+
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist == null) {
+            return;
+        }
+
+        double[] spawn = getFreeSpawnPositionFarFrom(
+                protagonist.x,
+                protagonist.y,
+                SAFE_HOSTILE_SPAWN_DISTANCE * 0.72
+        );
+        ObjectManager.list.add(new AlienTeleport(spawn[0], spawn[1]));
+        alienRespawnCooldownFrames = ALIEN_RESPAWN_COOLDOWN_FRAMES;
     }
 
     private void tickScreenFeedback() {
@@ -512,7 +543,7 @@ public class GamePanel extends JPanel implements Runnable {
 
         for (int i = 0; i < alienReinforcements; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(protagonist.x, protagonist.y, SAFE_HOSTILE_SPAWN_DISTANCE * 0.75);
-            ObjectManager.list.add(new Alien(spawn[0], spawn[1]));
+            ObjectManager.list.add(new AlienTeleport(spawn[0], spawn[1]));
         }
 
         arcadeWaveTimer = Math.max(
@@ -734,6 +765,12 @@ public class GamePanel extends JPanel implements Runnable {
             case 5 -> AiTuning.adjustSuppressionDurationFrames(direction * 5);
             case 6 -> AiTuning.adjustSuppressionCoverBoost(direction * 0.05);
             case 7 -> AiTuning.adjustSuppressionNearMissRadius(direction * 4.0);
+            case 8 -> {
+                AiTuning.toggleAlienPackAggro();
+                if (!AiTuning.isAlienPackAggroEnabled()) {
+                    ObjectManager.clearAlienAggro();
+                }
+            }
             default -> {
             }
         }
@@ -1116,6 +1153,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawAiOptionRow(g2d, 5, "Suppression duree (frames)", Integer.toString(AiTuning.getSuppressionDurationFrames()));
         drawAiOptionRow(g2d, 6, "Suppression bonus couverture", String.format("%.2f", AiTuning.getSuppressionCoverBoost()));
         drawAiOptionRow(g2d, 7, "Suppression rayon (px)", Integer.toString((int) Math.round(AiTuning.getSuppressionNearMissRadius())));
+        drawAiOptionRow(g2d, 8, "Aliens meute agressive", AiTuning.isAlienPackAggroEnabled() ? "ON" : "OFF");
 
         drawButton(g2d, getBackButtonBounds(), "Retour");
         g2d.setFont(oldFont);

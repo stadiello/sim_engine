@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import object.ai.TacticalMovement;
 import world.TileManager;
 
 public class ObjectManager {
@@ -20,8 +21,15 @@ public class ObjectManager {
     private static final ArrayList<GameObject> pendingAdditions = new ArrayList<>();
     private static final ArrayList<GameObject> pendingRemovals = new ArrayList<>();
     private static final Set<GameObject> pendingRemovalSet = new HashSet<>();
+    private static final int ALIEN_HIVE_BREAK_MIN_FRAMES = 120;
+    private static final int ALIEN_HIVE_BREAK_MAX_FRAMES = 180;
     private static boolean updating;
     private static Protagonist protagonist;
+    private static boolean alienHiveActive;
+    private static Homme alienHiveAggressor;
+    private static Alien alienHiveAlpha;
+    private static int alienHiveNoLosMajorityFrames;
+    private static int alienHiveBreakThresholdFrames = 150;
 
     public static void setTileManager(TileManager manager) {
         tileManager = manager;
@@ -138,6 +146,64 @@ public class ObjectManager {
         return livingHumans;
     }
 
+    public static void alertAliensToAggressor(Homme aggressor) {
+        if (aggressor == null) {
+            return;
+        }
+
+        synchronized (LOCK) {
+            for (Alien alien : aliens) {
+                if (pendingRemovalSet.contains(alien)) {
+                    continue;
+                }
+                alien.setAggroTarget(aggressor);
+            }
+        }
+    }
+
+    public static void activateAlienHiveAggro(Homme aggressor, Alien alphaAlien) {
+        if (aggressor == null) {
+            return;
+        }
+
+        synchronized (LOCK) {
+            alienHiveActive = true;
+            alienHiveAggressor = aggressor;
+            alienHiveAlpha = alphaAlien;
+            alienHiveNoLosMajorityFrames = 0;
+            alienHiveBreakThresholdFrames = ALIEN_HIVE_BREAK_MIN_FRAMES
+                    + (int) (Math.random() * (ALIEN_HIVE_BREAK_MAX_FRAMES - ALIEN_HIVE_BREAK_MIN_FRAMES + 1));
+            for (Alien alien : aliens) {
+                if (pendingRemovalSet.contains(alien)) {
+                    continue;
+                }
+                alien.setAggroTarget(aggressor);
+            }
+        }
+    }
+
+    public static void clearAlienAggro() {
+        clearAlienAggro(true);
+    }
+
+    private static void clearAlienAggro(boolean resetHiveState) {
+        synchronized (LOCK) {
+            for (Alien alien : aliens) {
+                if (pendingRemovalSet.contains(alien)) {
+                    continue;
+                }
+                alien.clearAggroTarget();
+            }
+
+            if (resetHiveState) {
+                alienHiveActive = false;
+                alienHiveAggressor = null;
+                alienHiveAlpha = null;
+                alienHiveNoLosMajorityFrames = 0;
+            }
+        }
+    }
+
     public static Alien getNearestAlien(double x, double y) {
         synchronized (LOCK) {
             Alien nearest = null;
@@ -222,9 +288,94 @@ public class ObjectManager {
                 }
                 obj.update();
             }
+            updateAlienHiveState();
             updating = false;
             flushPendingChanges();
         }
+    }
+
+    private static void updateAlienHiveState() {
+        if (!alienHiveActive) {
+            return;
+        }
+
+        if (!isObjectAliveUnlocked(alienHiveAggressor)) {
+            clearAlienAggro(false);
+            alienHiveActive = false;
+            alienHiveAlpha = null;
+            alienHiveAggressor = null;
+            alienHiveNoLosMajorityFrames = 0;
+            return;
+        }
+
+        // Si l'alpha est elimine, on tente d'en designer un nouveau pour conserver la coordination.
+        if (!isObjectAliveUnlocked(alienHiveAlpha)) {
+            alienHiveAlpha = selectReplacementHiveAlpha();
+            if (alienHiveAlpha == null) {
+                clearAlienAggro(true);
+                return;
+            }
+        }
+
+        int totalAliens = 0;
+        int aliensWithLos = 0;
+        for (Alien alien : aliens) {
+            if (pendingRemovalSet.contains(alien)) {
+                continue;
+            }
+
+            totalAliens++;
+            if (TacticalMovement.hasLineOfSight(alien.x, alien.y, alienHiveAggressor.x, alienHiveAggressor.y)) {
+                aliensWithLos++;
+            }
+        }
+
+        if (totalAliens <= 0) {
+            clearAlienAggro(true);
+            return;
+        }
+
+        if (aliensWithLos * 2 <= totalAliens) {
+            alienHiveNoLosMajorityFrames++;
+        } else {
+            alienHiveNoLosMajorityFrames = 0;
+        }
+
+        // Sortie de ligne de vue de la majorite des aliens pendant 2-3 secondes.
+        if (alienHiveNoLosMajorityFrames >= alienHiveBreakThresholdFrames) {
+            clearAlienAggro(true);
+        }
+    }
+
+    private static boolean isObjectAliveUnlocked(GameObject obj) {
+        return obj != null && list.contains(obj) && !pendingRemovalSet.contains(obj);
+    }
+
+    private static Alien selectReplacementHiveAlpha() {
+        Alien selected = null;
+        double bestDistSq = Double.MAX_VALUE;
+
+        for (Alien alien : aliens) {
+            if (pendingRemovalSet.contains(alien)) {
+                continue;
+            }
+
+            double distSq;
+            if (alienHiveAggressor == null) {
+                distSq = 0.0;
+            } else {
+                double dx = alien.x - alienHiveAggressor.x;
+                double dy = alien.y - alienHiveAggressor.y;
+                distSq = dx * dx + dy * dy;
+            }
+
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                selected = alien;
+            }
+        }
+
+        return selected;
     }
 
     public static void drawAll(Graphics g) {
@@ -287,6 +438,10 @@ public class ObjectManager {
         pendingRemovals.clear();
         pendingRemovalSet.clear();
         protagonist = null;
+        alienHiveActive = false;
+        alienHiveAggressor = null;
+        alienHiveAlpha = null;
+        alienHiveNoLosMajorityFrames = 0;
     }
 
     private static void flushPendingChanges() {
@@ -322,6 +477,9 @@ public class ObjectManager {
 
         if (obj instanceof Alien alien) {
             aliens.add(alien);
+            if (alienHiveActive && isObjectAliveUnlocked(alienHiveAggressor)) {
+                alien.setAggroTarget(alienHiveAggressor);
+            }
         }
     }
 

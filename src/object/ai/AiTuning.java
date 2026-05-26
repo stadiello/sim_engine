@@ -9,6 +9,7 @@ public final class AiTuning {
     private static int suppressionDurationFrames = 90;
     private static double suppressionCoverBoost = 0.65;
     private static double suppressionNearMissRadius = 92.0;
+    private static boolean alienPackAggroEnabled = true;
 
     private AiTuning() {
     }
@@ -41,6 +42,10 @@ public final class AiTuning {
         return suppressionNearMissRadius;
     }
 
+    public static boolean isAlienPackAggroEnabled() {
+        return alienPackAggroEnabled;
+    }
+
     public static void adjustEnemyReactionFrames(int delta) {
         enemyReactionFrames = clampInt(enemyReactionFrames + delta, 2, 40);
     }
@@ -67,6 +72,10 @@ public final class AiTuning {
 
     public static void adjustSuppressionNearMissRadius(double delta) {
         suppressionNearMissRadius = clampDouble(suppressionNearMissRadius + delta, 30.0, 180.0);
+    }
+
+    public static void toggleAlienPackAggro() {
+        alienPackAggroEnabled = !alienPackAggroEnabled;
     }
 
     private static int clampInt(int value, int min, int max) {

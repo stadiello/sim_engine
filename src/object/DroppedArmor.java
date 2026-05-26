@@ -28,20 +28,31 @@ public class DroppedArmor extends GameObject {
         }
 
         for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {
-            if (!(obj instanceof Protagonist protagonist)) {
-                continue;
+            if (obj instanceof Protagonist protagonist) {
+                double dx = protagonist.x - x;
+                double dy = protagonist.y - y;
+                if (dx * dx + dy * dy > PICKUP_RADIUS * PICKUP_RADIUS) {
+                    continue;
+                }
+
+                if (protagonist.addArmorPlate()) {
+                    ObjectManager.list.remove(this);
+                }
+                return;
             }
 
-            double dx = protagonist.x - x;
-            double dy = protagonist.y - y;
-            if (dx * dx + dy * dy > PICKUP_RADIUS * PICKUP_RADIUS) {
-                continue;
-            }
+            if (obj instanceof Soldat soldat) {
+                double dx = soldat.x - x;
+                double dy = soldat.y - y;
+                if (dx * dx + dy * dy > PICKUP_RADIUS * PICKUP_RADIUS) {
+                    continue;
+                }
 
-            if (protagonist.addArmorPlate()) {
-                ObjectManager.list.remove(this);
+                if (soldat.addArmorPlate()) {
+                    ObjectManager.list.remove(this);
+                }
+                return;
             }
-            return;
         }
     }
 

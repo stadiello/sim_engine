@@ -6,6 +6,11 @@ import javax.imageio.ImageIO;
 
 public class Alien extends Homme {
 
+    private static final double AGGRO_CHASE_SPEED = 2.8;
+    private static final double AGGRO_RELEASE_DISTANCE = 22.0;
+    private static final double ATTACK_RADIUS = 18.0;
+    private static final int ATTACK_COOLDOWN_FRAMES = 26;
+
     private static Image imgAlien;
 
     static {
@@ -16,6 +21,8 @@ public class Alien extends Homme {
         }
     }
     private int timer = 0;
+    private Homme aggroTarget;
+    private int attackCooldownFrames = 0;
 
     public Alien(double x, double y) {
         super(x, y);
@@ -24,8 +31,69 @@ public class Alien extends Homme {
     }
 
     public void update() {
+        if (attackCooldownFrames > 0) {
+            attackCooldownFrames--;
+        }
+
+        if (aggroTarget != null) {
+            if (!ObjectManager.list.contains(aggroTarget)) {
+                aggroTarget = null;
+            } else {
+                double dx = aggroTarget.x - x;
+                double dy = aggroTarget.y - y;
+                double distSq = dx * dx + dy * dy;
+                if (distSq > AGGRO_RELEASE_DISTANCE * AGGRO_RELEASE_DISTANCE) {
+                    double invDist = 1.0 / Math.sqrt(distSq);
+                    double moveSpeed = AGGRO_CHASE_SPEED * getSuppressionMoveMultiplier();
+                    vx = dx * invDist * moveSpeed;
+                    vy = dy * invDist * moveSpeed;
+                } else {
+                    vx = 0;
+                    vy = 0;
+                }
+            }
+        }
+
         moveWithTileCollision(14);
+        tryMeleeAttack();
         timer++;
+    }
+
+    private void tryMeleeAttack() {
+        if (attackCooldownFrames > 0) {
+            return;
+        }
+
+        for (Homme target : ObjectManager.getOverlappingHumans(x, y, ATTACK_RADIUS, this)) {
+            if (target instanceof Alien || target instanceof Ennemi) {
+                continue;
+            }
+
+            attackCooldownFrames = ATTACK_COOLDOWN_FRAMES;
+
+            if (target instanceof Protagonist protagonist && protagonist.consumeArmorPlateOnHit()) {
+                return;
+            }
+
+            if (target instanceof Soldat soldat && soldat.consumeArmorPlateOnHit()) {
+                return;
+            }
+
+            ObjectManager.list.remove(target);
+            target.onDeath();
+            return;
+        }
+    }
+
+    public void setAggroTarget(Homme target) {
+        if (target == null || target == this) {
+            return;
+        }
+        aggroTarget = target;
+    }
+
+    public void clearAggroTarget() {
+        aggroTarget = null;
     }
 
     @Override

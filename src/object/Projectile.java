@@ -136,6 +136,16 @@ public class Projectile extends GameObject {
                     return;
                 }
 
+                if (homme instanceof Soldat soldat && soldat.consumeArmorPlateOnHit()) {
+                    ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.10, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
+                    if (GameMode.current == main.GameMode.ARCADE) {
+                        GamePanel.triggerScreenShake(3, 1.4);
+                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.04f, 2);
+                    }
+                    ObjectManager.list.remove(this);
+                    return;
+                }
+
                 if (homme instanceof Ennemi ennemi && ennemi.absorbFrontHit(vx, vy)) {
                     ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.2, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
                     if (GameMode.current == main.GameMode.ARCADE) {
@@ -144,6 +154,10 @@ public class Projectile extends GameObject {
                     }
                     ObjectManager.list.remove(this);
                     return;
+                }
+
+                if (homme instanceof Alien hitAlien && AiTuning.isAlienPackAggroEnabled()) {
+                    ObjectManager.activateAlienHiveAggro(tireur, hitAlien);
                 }
 
                 ObjectManager.list.remove(homme);
