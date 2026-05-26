@@ -86,6 +86,13 @@ public class Ennemi extends Homme {
         if (GameMode.current == GameMode.STORY) {
             ObjectManager.list.add(new DroppedWeapon(x, y, carriedWeapon));
         }
+
+        double armorDropChance = GameMode.current == GameMode.ARCADE
+                ? 0.28
+                : GameMode.current == GameMode.PROTECTION ? 0.22 : 0.16;
+        if (Math.random() < armorDropChance) {
+            ObjectManager.list.add(new DroppedArmor(x, y));
+        }
     }
 
     @Override

@@ -5,6 +5,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import main.GamePanel;
+import main.GameMode;
 import main.Utils;
 import object.ai.AiTuning;
 import world.TileManager;
@@ -19,6 +20,10 @@ public class Projectile extends GameObject {
     private static final double GRENADE_BLAST_RADIUS = 72.0;
     private static final int GRENADE_FUSE_FRAMES = 180;
     private static final int GRENADE_SPARK_COUNT = 3;
+    private static final Color METAL_IMPACT_CORE = new Color(255, 236, 180);
+    private static final Color METAL_IMPACT_EMBER = new Color(255, 140, 84);
+    private static final Color FLESH_IMPACT_CORE = new Color(255, 196, 118);
+    private static final Color FLESH_IMPACT_EMBER = new Color(255, 86, 68);
 
     private static Image imgShot;
     private static Image imgBullet;
@@ -79,7 +84,10 @@ public class Projectile extends GameObject {
                 tileManager.damageTileAtPixel(x, y, tileDamage);
             }
             ObjectManager.list.remove(this);
-            ObjectManager.list.add(new ImpactSpark(x, y));
+            ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.0, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
+            if (GameMode.current == main.GameMode.ARCADE) {
+                GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.025f, 2);
+            }
             return;
         }
 
@@ -118,15 +126,33 @@ public class Projectile extends GameObject {
             }
 
             if (distSq < hitRadiusSq) {
+                if (homme instanceof Protagonist protagonist && protagonist.consumeArmorPlateOnHit()) {
+                    ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.15, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
+                    if (GameMode.current == main.GameMode.ARCADE) {
+                        GamePanel.triggerScreenShake(4, 1.6);
+                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.045f, 3);
+                    }
+                    ObjectManager.list.remove(this);
+                    return;
+                }
+
                 if (homme instanceof Ennemi ennemi && ennemi.absorbFrontHit(vx, vy)) {
-                    ObjectManager.list.add(new ImpactSpark(x, y));
+                    ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.2, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
+                    if (GameMode.current == main.GameMode.ARCADE) {
+                        GamePanel.triggerScreenShake(4, 1.8);
+                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.05f, 3);
+                    }
                     ObjectManager.list.remove(this);
                     return;
                 }
 
                 ObjectManager.list.remove(homme);
                 homme.onDeath();
-                ObjectManager.list.add(new ImpactSpark(x, y));
+                ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.5, FLESH_IMPACT_CORE, FLESH_IMPACT_EMBER));
+                if (GameMode.current == main.GameMode.ARCADE) {
+                    GamePanel.triggerScreenShake(5, 2.3);
+                    GamePanel.triggerScreenFlash(FLESH_IMPACT_EMBER, 0.06f, 3);
+                }
                 ObjectManager.list.remove(this);
                 GamePanel.score += 10;
                 return;
@@ -194,10 +220,21 @@ public class Projectile extends GameObject {
         }
 
         for (int i = 0; i < GRENADE_SPARK_COUNT; i++) {
-            ObjectManager.list.add(new ImpactSpark(x, y));
+            ObjectManager.list.add(new ImpactSpark(
+                    x,
+                    y,
+                    Math.random() * 2.0 - 1.0,
+                    Math.random() * 2.0 - 1.0,
+                    1.8,
+                    METAL_IMPACT_CORE,
+                    METAL_IMPACT_EMBER));
         }
 
         ObjectManager.list.add(new Shockwave(x, y, tireur, GRENADE_BLAST_RADIUS));
+        if (GameMode.current == main.GameMode.ARCADE) {
+            GamePanel.triggerScreenShake(14, 7.0);
+            GamePanel.triggerScreenFlash(new Color(255, 176, 110), 0.22f, 8);
+        }
 
         ObjectManager.list.remove(this);
     }

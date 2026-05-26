@@ -11,18 +11,33 @@ public class ImpactSpark extends GameObject {
     private final double[] py = new double[PARTICLE_COUNT];
     private final double[] pvx = new double[PARTICLE_COUNT];
     private final double[] pvy = new double[PARTICLE_COUNT];
+    private final Color coreColor;
+    private final Color emberColor;
+    private final double particleScale;
     private int lifetime = MAX_LIFETIME;
 
     public ImpactSpark(double x, double y) {
+        this(x, y, 0.0, -1.0, 1.0, new Color(255, 210, 90), new Color(255, 160, 64));
+    }
+
+    public ImpactSpark(double x, double y, double dirX, double dirY, double intensity, Color coreColor, Color emberColor) {
         super(x, y);
+        this.coreColor = coreColor;
+        this.emberColor = emberColor;
+        this.particleScale = Math.max(0.75, intensity);
+
+        double dirLength = Math.hypot(dirX, dirY);
+        double normDirX = dirLength <= 0.0001 ? 0.0 : dirX / dirLength;
+        double normDirY = dirLength <= 0.0001 ? -1.0 : dirY / dirLength;
 
         for (int i = 0; i < PARTICLE_COUNT; i++) {
-            double a = Math.random() * Math.PI * 2;
-            double s = 1.2 + Math.random() * 2.2;
+            double spread = (Math.random() - 0.5) * Math.PI * 0.9;
+            double baseAngle = Math.atan2(normDirY, normDirX) + Math.PI + spread;
+            double s = (1.6 + Math.random() * 2.8) * particleScale;
             px[i] = x;
             py[i] = y;
-            pvx[i] = Math.cos(a) * s;
-            pvy[i] = Math.sin(a) * s;
+            pvx[i] = Math.cos(baseAngle) * s;
+            pvy[i] = Math.sin(baseAngle) * s;
         }
     }
 
@@ -47,9 +62,15 @@ public class ImpactSpark extends GameObject {
         float alpha = Math.max(0f, (float) lifetime / MAX_LIFETIME);
 
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-        g2d.setColor(new Color(255, 210, 90));
+        g2d.setStroke(new BasicStroke((float) Math.max(1.4, particleScale * 1.3), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         for (int i = 0; i < PARTICLE_COUNT; i++) {
-            g2d.fillOval((int) px[i] - 2, (int) py[i] - 2, 4, 4);
+            double tailX = px[i] - pvx[i] * 1.4;
+            double tailY = py[i] - pvy[i] * 1.4;
+            g2d.setColor(emberColor);
+            g2d.drawLine((int) Math.round(tailX), (int) Math.round(tailY), (int) Math.round(px[i]), (int) Math.round(py[i]));
+            g2d.setColor(coreColor);
+            int size = (int) Math.max(3, Math.round(3 * particleScale));
+            g2d.fillOval((int) Math.round(px[i]) - size / 2, (int) Math.round(py[i]) - size / 2, size, size);
         }
 
         g2d.setComposite(oldComposite);

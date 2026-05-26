@@ -2,6 +2,7 @@ package main;
 
 public enum GameMode {
     FREE,
+    ARCADE,
     STORY,
     PROTECTION;
 

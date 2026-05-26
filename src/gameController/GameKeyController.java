@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class GameKeyController implements KeyEventDispatcher, MouseMotionListener, MouseListener, MouseWheelListener {
     
     private boolean up, down, left, right;
+    private boolean sprint;
     private volatile boolean leftClickPressed;
     private volatile boolean leftClickTriggered;
     private volatile boolean rightClickTriggered;
@@ -39,6 +40,7 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
             case KeyEvent.VK_LEFT, KeyEvent.VK_Q, KeyEvent.VK_A -> left = pressed;
             // Droite: fleche droite, D
             case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> right = pressed;
+            case KeyEvent.VK_SHIFT -> sprint = pressed;
             case KeyEvent.VK_P -> {
                 if (pressed) {
                     if (!pauseKeyPressed) {
@@ -57,6 +59,7 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public boolean isDown() { return down; }
     public boolean isLeft() { return left; }
     public boolean isRight() { return right; }
+    public boolean isSprint() { return sprint; }
     public boolean isLeftClickPressed() { return leftClickPressed; }
     public boolean consumeLeftClickPressed() {
         boolean wasTriggered = leftClickTriggered;

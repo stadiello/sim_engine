@@ -6,6 +6,8 @@ import java.awt.Color;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
+import main.GameMode;
+import main.GamePanel;
 import main.Utils;
 import object.Douille;
 import object.Homme;
@@ -13,6 +15,8 @@ import object.ObjectManager;
 import object.Projectile;
 
 public final class Weapon {
+
+    private static final double MUZZLE_LEFT_BIAS = 10.0;
 
     public enum FireSound {
         LASER,
@@ -197,11 +201,23 @@ public final class Weapon {
     }
 
     public int getCooldownFrames() {
-        return cooldownFrames;
+        if (GameMode.current != GameMode.ARCADE) {
+            return cooldownFrames;
+        }
+
+        if (projectileType == Projectile.ProjectileType.GRENADE) {
+            return Math.max(30, cooldownFrames - 8);
+        }
+        if (isShotgun()) {
+            return Math.max(26, cooldownFrames - 8);
+        }
+        return Math.max(2, (int) Math.round(cooldownFrames * 0.82));
     }
 
     public double getProjectileSpeed() {
-        return projectileSpeed;
+        return GameMode.current == GameMode.ARCADE && projectileType != Projectile.ProjectileType.GRENADE
+                ? projectileSpeed * 1.06
+                : projectileSpeed;
     }
 
     public boolean isShotgun() {
@@ -245,11 +261,34 @@ public final class Weapon {
     }
 
     public void fire(Homme shooter, double facingX, double facingY) {
+        fire(shooter, shooter.x, shooter.y, facingX, facingY);
+    }
+
+    public void fire(Homme shooter, double originX, double originY, double facingX, double facingY) {
+        double len = Math.hypot(facingX, facingY);
+        if (len <= 0.0001) {
+            return;
+        }
+
+        double dirX = facingX / len;
+        double dirY = facingY / len;
+        double projectileSpeedValue = getProjectileSpeed();
+        double muzzleOriginX = originX;
+        double muzzleOriginY = originY;
+
+        double[] muzzleOrigin = getMuzzleOrigin(originX, originY, dirX, dirY);
+        muzzleOriginX = muzzleOrigin[0];
+        muzzleOriginY = muzzleOrigin[1];
+
+        if (GameMode.current == GameMode.ARCADE) {
+            triggerArcadeFireFeedback();
+        }
+
         // Pour le shotgun, créer plusieurs pellets en éventail
         if (projectileType == Projectile.ProjectileType.SHOTGUN_PELLET) {
             int pelletCount = 8; // Nombre de pellets
             double spreadAngle = Math.PI / 6; // pi/3 = 60 degrés d'angle de dispersion pi/4 = 45 degrés, pi/6 = 30 degrés
-            double baseAngle = Math.atan2(facingY, facingX);
+            double baseAngle = Math.atan2(dirY, dirX);
             
             for (int i = 0; i < pelletCount; i++) {
                 double angle = baseAngle + (spreadAngle / (pelletCount - 1)) * i - spreadAngle / 2;
@@ -257,26 +296,26 @@ public final class Weapon {
                 double spreadY = Math.sin(angle);
                 
                 ObjectManager.list.add(new Projectile(
-                        shooter.x,
-                        shooter.y,
-                        spreadX * projectileSpeed,
-                        spreadY * projectileSpeed,
+                        muzzleOriginX,
+                        muzzleOriginY,
+                        spreadX * projectileSpeedValue,
+                        spreadY * projectileSpeedValue,
                         shooter,
                         projectileType));
             }
         } else {
             // Comportement normal pour les autres armes
             ObjectManager.list.add(new Projectile(
-                    shooter.x,
-                    shooter.y,
-                    facingX * projectileSpeed,
-                    facingY * projectileSpeed,
+                    muzzleOriginX,
+                    muzzleOriginY,
+                    dirX * projectileSpeedValue,
+                    dirY * projectileSpeedValue,
                     shooter,
                     projectileType));
         }
 
         if (ejectShell) {
-            spawnDouille(shooter, facingX, facingY);
+            spawnDouille(shooter, dirX, dirY);
         }
 
         playSound();
@@ -287,7 +326,8 @@ public final class Weapon {
             return;
         }
 
-        int offsetArme = shot ? (int) (Math.sin(timer * 0.15) * recoilAmplitude) : 0;
+        double recoilScale = GameMode.current == GameMode.ARCADE ? 1.35 : 1.0;
+        int offsetArme = shot ? (int) (Math.sin(timer * 0.15) * recoilAmplitude * recoilScale) : 0;
         if (sprite != null) {
             g2d.drawImage(sprite, (int) x + drawOffsetX, (int) y + drawOffsetY + offsetArme, drawWidth, drawHeight, null);
             return;
@@ -316,6 +356,62 @@ public final class Weapon {
             case NONE -> {
             }
         }
+    }
+
+    private void triggerArcadeFireFeedback() {
+        if (projectileType == Projectile.ProjectileType.GRENADE) {
+            GamePanel.triggerScreenShake(10, 5.0);
+            GamePanel.triggerScreenFlash(new Color(255, 226, 180), 0.12f, 5);
+            return;
+        }
+        if (isShotgun()) {
+            GamePanel.triggerScreenShake(6, 3.0);
+            GamePanel.triggerScreenFlash(new Color(255, 232, 190), 0.08f, 4);
+            return;
+        }
+        if (isAutomatic()) {
+            GamePanel.triggerScreenShake(3, 1.2);
+            GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.03f, 2);
+        }
+    }
+
+    private double[] getMuzzleOrigin(double originX, double originY, double dirX, double dirY) {
+        double perpX = -dirY;
+        double perpY = dirX;
+
+        double forwardOffset = getMuzzleForwardOffset();
+        double lateralOffset = getMuzzleLateralOffset() + MUZZLE_LEFT_BIAS;
+        double muzzleX = originX + dirX * forwardOffset - perpX * lateralOffset;
+        double muzzleY = originY + dirY * forwardOffset - perpY * lateralOffset;
+        return new double[]{muzzleX, muzzleY};
+    }
+
+    private double getMuzzleForwardOffset() {
+        double base = drawOffsetX + drawWidth - 1;
+        if (isShotgun()) {
+            return base + 4.0;
+        }
+        if (isMinigun()) {
+            return base + 2.0;
+        }
+        if (projectileType == Projectile.ProjectileType.GRENADE) {
+            return base + 1.0;
+        }
+        return base + 3.0;
+    }
+
+    private double getMuzzleLateralOffset() {
+        double centerY = drawOffsetY + drawHeight * 0.5;
+        if (isShotgun()) {
+            return centerY + 1.5;
+        }
+        if (isMinigun()) {
+            return centerY - 1.0;
+        }
+        if (projectileType == Projectile.ProjectileType.GRENADE) {
+            return centerY + 0.5;
+        }
+        return centerY;
     }
 
     private void spawnDouille(Homme shooter, double facingX, double facingY) {

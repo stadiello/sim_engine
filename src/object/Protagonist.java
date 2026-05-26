@@ -13,6 +13,10 @@ import java.util.ArrayList;
 
 public class Protagonist extends Homme{
 
+    private static final double ARCADE_MOVE_SPEED_MULTIPLIER = 1.12;
+    private static final double SPRINT_MOVE_SPEED_MULTIPLIER = 1.45;
+    private static final int MAX_ARMOR_PLATES = 3;
+
     // private static final double WALK_CYCLE_SPEED = 0.42;
     // private static final double WALK_BLEND_RATE = 0.18;
 
@@ -30,6 +34,7 @@ public class Protagonist extends Homme{
     private double facingX;
     private double facingY;
     private int selectedWeaponIndex = 0;
+    private int armorPlates = 0;
     // private double walkCycle = 0;
     // private double walkBlend = 0;
 
@@ -70,6 +75,26 @@ public class Protagonist extends Homme{
 
     public boolean hasWeapon(Weapon weapon) {
         return loadout.contains(weapon);
+    }
+
+    public boolean addArmorPlate() {
+        if (armorPlates >= MAX_ARMOR_PLATES) {
+            return false;
+        }
+        armorPlates++;
+        return true;
+    }
+
+    public boolean consumeArmorPlateOnHit() {
+        if (armorPlates <= 0) {
+            return false;
+        }
+        armorPlates--;
+        return true;
+    }
+
+    public int getArmorPlates() {
+        return armorPlates;
     }
 
     @Override
@@ -177,6 +202,12 @@ public class Protagonist extends Homme{
         }
 
         double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
+        if (GameMode.current == GameMode.ARCADE) {
+            moveSpeed *= ARCADE_MOVE_SPEED_MULTIPLIER;
+        }
+        if (keyController.isSprint()) {
+            moveSpeed *= SPRINT_MOVE_SPEED_MULTIPLIER;
+        }
 
         if (keyController.isLeft()) inputX -= 1;
         if (keyController.isRight()) inputX += 1;

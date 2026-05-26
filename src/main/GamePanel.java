@@ -23,6 +23,9 @@ public class GamePanel extends JPanel implements Runnable {
 
     private static final int TARGET_UPS = 60;
     private static final long NANOS_PER_UPDATE = 1_000_000_000L / TARGET_UPS;
+    private static final int ARCADE_BASE_WAVE_INTERVAL_FRAMES = TARGET_UPS * 14;
+    private static final int ARCADE_MIN_WAVE_INTERVAL_FRAMES = TARGET_UPS * 7;
+    private static final int ARCADE_WAVE_BANNER_FRAMES = TARGET_UPS * 2;
 
     private enum ScreenState {
         MENU,
@@ -53,16 +56,26 @@ public class GamePanel extends JPanel implements Runnable {
     private static final double ENEMY_FLASHLIGHT_HALF_ANGLE = Math.toRadians(25);
     private static final double EXTRACTION_MARGIN_TILES = 1.5;
     private static final double FLASHLIGHT_RAY_STEP = 8.0;
+    private static GamePanel activePanel;
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
     private String gameOverTitle = "VOUS ETES MORT";
+    private int arcadeWaveIndex = 0;
+    private int arcadeWaveTimer = ARCADE_BASE_WAVE_INTERVAL_FRAMES;
+    private int arcadeWaveBannerTimer = 0;
+    private int screenShakeFrames = 0;
+    private double screenShakeAmplitude = 0.0;
+    private int screenFlashFrames = 0;
+    private Color screenFlashColor = new Color(255, 236, 160);
+    private float screenFlashAlpha = 0f;
 
     public static int score = 0;
 
     public GamePanel() {
+        activePanel = this;
         ObjectManager.setTileManager(tileManager);
         addMouseMotionListener(keyController);
         addMouseListener(keyController);
@@ -76,11 +89,15 @@ public class GamePanel extends JPanel implements Runnable {
         ObjectManager.list.clear();
         score = 0;
         gameOverTitle = "VOUS ETES MORT";
+        resetArcadeState();
 
         int civilsToSpawn = nombreCivil;
         int soldatsToSpawn = nombreSoldat;
         if (GameMode.current == GameMode.PROTECTION) {
             civilsToSpawn = Math.max(4, nombreCivil);
+            soldatsToSpawn = Math.max(1, nombreSoldat);
+        } else if (GameMode.current == GameMode.ARCADE) {
+            civilsToSpawn = Math.max(1, Math.min(2, nombreCivil));
             soldatsToSpawn = Math.max(1, nombreSoldat);
         }
 
@@ -105,7 +122,8 @@ public class GamePanel extends JPanel implements Runnable {
             ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
         }
 
-        for (int i = 0; i < nombreAlien; i++) {
+        int aliensToSpawn = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien - 1) : nombreAlien;
+        for (int i = 0; i < aliensToSpawn; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(
                     protagonistSpawnX,
                     protagonistSpawnY,
@@ -114,8 +132,9 @@ public class GamePanel extends JPanel implements Runnable {
             ObjectManager.list.add(new Alien(spawn[0], spawn[1]));
         }
 
+        int enemyCount = GameMode.current == GameMode.ARCADE ? Math.max(8, nombreEnnemi - 1) : nombreEnnemi;
         int[][] enemySpawnZones = buildEnemySpawnZones();
-        for (int i = 0; i < nombreEnnemi; i++) {
+        for (int i = 0; i < enemyCount; i++) {
             int[] zone = enemySpawnZones[i % enemySpawnZones.length];
             double[] spawn = getFreeSpawnPositionInZoneFarFrom(
                     zone[0],
@@ -126,8 +145,19 @@ public class GamePanel extends JPanel implements Runnable {
                     protagonistSpawnY,
                     SAFE_HOSTILE_SPAWN_DISTANCE
             );
-            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], chooseEnemyArchetype(i, nombreEnnemi)));
+            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], chooseEnemyArchetype(i, enemyCount)));
         }
+    }
+
+    private void resetArcadeState() {
+        arcadeWaveIndex = 0;
+        arcadeWaveTimer = ARCADE_BASE_WAVE_INTERVAL_FRAMES;
+        arcadeWaveBannerTimer = 0;
+        screenShakeFrames = 0;
+        screenShakeAmplitude = 0.0;
+        screenFlashFrames = 0;
+        screenFlashAlpha = 0f;
+        screenFlashColor = new Color(255, 236, 160);
     }
 
     private EnemyArchetype chooseEnemyArchetype(int index, int total) {
@@ -384,9 +414,12 @@ public class GamePanel extends JPanel implements Runnable {
             paused = !paused;
         }
 
+        tickScreenFeedback();
+
         if (screenState == ScreenState.PLAYING && !paused) {
             applySoldierMoveCommand();
             ObjectManager.updateAll();
+            updateArcadeMode();
             Protagonist protagonist = ObjectManager.getProtagonist();
             if (protagonist == null) {
                 gameOverTitle = "VOUS ETES MORT";
@@ -416,6 +449,97 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
+    private void tickScreenFeedback() {
+        if (screenShakeFrames > 0) {
+            screenShakeFrames--;
+            screenShakeAmplitude *= 0.82;
+            if (screenShakeFrames == 0) {
+                screenShakeAmplitude = 0.0;
+            }
+        }
+
+        if (screenFlashFrames > 0) {
+            screenFlashFrames--;
+            screenFlashAlpha *= 0.72f;
+            if (screenFlashFrames == 0) {
+                screenFlashAlpha = 0f;
+            }
+        }
+    }
+
+    private void updateArcadeMode() {
+        if (GameMode.current != GameMode.ARCADE || screenState != ScreenState.PLAYING) {
+            return;
+        }
+
+        if (arcadeWaveBannerTimer > 0) {
+            arcadeWaveBannerTimer--;
+        }
+
+        if (arcadeWaveTimer > 0) {
+            arcadeWaveTimer--;
+            return;
+        }
+
+        spawnArcadeWave();
+    }
+
+    private void spawnArcadeWave() {
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist == null) {
+            return;
+        }
+
+        arcadeWaveIndex++;
+        arcadeWaveBannerTimer = ARCADE_WAVE_BANNER_FRAMES;
+        int enemyReinforcements = Math.min(6, 2 + arcadeWaveIndex / 2);
+        int alienReinforcements = arcadeWaveIndex >= 2 && arcadeWaveIndex % 2 == 0 ? 1 : 0;
+        int[][] enemySpawnZones = buildEnemySpawnZones();
+
+        for (int i = 0; i < enemyReinforcements; i++) {
+            int[] zone = enemySpawnZones[(arcadeWaveIndex + i) % enemySpawnZones.length];
+            double[] spawn = getFreeSpawnPositionInZoneFarFrom(
+                    zone[0],
+                    zone[1],
+                    zone[2],
+                    zone[3],
+                    protagonist.x,
+                    protagonist.y,
+                    SAFE_HOSTILE_SPAWN_DISTANCE * 0.8
+            );
+            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], chooseArcadeArchetype(i, enemyReinforcements)));
+        }
+
+        for (int i = 0; i < alienReinforcements; i++) {
+            double[] spawn = getFreeSpawnPositionFarFrom(protagonist.x, protagonist.y, SAFE_HOSTILE_SPAWN_DISTANCE * 0.75);
+            ObjectManager.list.add(new Alien(spawn[0], spawn[1]));
+        }
+
+        arcadeWaveTimer = Math.max(
+                ARCADE_MIN_WAVE_INTERVAL_FRAMES,
+                ARCADE_BASE_WAVE_INTERVAL_FRAMES - arcadeWaveIndex * TARGET_UPS / 2
+        );
+        triggerScreenShake(6 + arcadeWaveIndex, 4.8);
+        triggerScreenFlash(new Color(255, 154, 88), 0.16f, 6);
+    }
+
+    private EnemyArchetype chooseArcadeArchetype(int index, int waveSize) {
+        double pressure = arcadeWaveIndex + index / (double) Math.max(1, waveSize);
+        if (pressure < 1.5) {
+            return EnemyArchetype.STANDARD;
+        }
+        if (pressure < 3.2) {
+            return index % 3 == 0 ? EnemyArchetype.ASSAUT : EnemyArchetype.FLANQUEUR;
+        }
+        if (pressure < 5.0) {
+            return index % 4 == 0 ? EnemyArchetype.LOURD : EnemyArchetype.ASSAUT;
+        }
+        if (index % 5 == 0) {
+            return EnemyArchetype.LOURD;
+        }
+        return index % 2 == 0 ? EnemyArchetype.FLANQUEUR : EnemyArchetype.ASSAUT;
+    }
+
     private void handleMenuInput() {
         if (screenState == ScreenState.PLAYING && !paused) {
             return;
@@ -443,6 +567,11 @@ public class GamePanel extends JPanel implements Runnable {
 
             if (getFreeModeButtonBounds().contains(mouseX, mouseY)) {
                 GameMode.current = GameMode.FREE;
+                initializeWorld();
+                screenState = ScreenState.PLAYING;
+                paused = false;
+            } else if (getArcadeModeButtonBounds().contains(mouseX, mouseY)) {
+                GameMode.current = GameMode.ARCADE;
                 initializeWorld();
                 screenState = ScreenState.PLAYING;
                 paused = false;
@@ -502,6 +631,11 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getStoryModeButtonBounds() {
+        Rectangle free = getArcadeModeButtonBounds();
+        return new Rectangle(free.x, free.y + 62, free.width, free.height);
+    }
+
+    private Rectangle getArcadeModeButtonBounds() {
         Rectangle free = getFreeModeButtonBounds();
         return new Rectangle(free.x, free.y + 62, free.width, free.height);
     }
@@ -803,16 +937,57 @@ public class GamePanel extends JPanel implements Runnable {
         g.drawString("Aliens: " + aliens, 10, 60);
         g.drawString("Casualties: " + Math.max(0, initialAllies - civils - soldats), 10, 80);
         g.drawString("P: Pause", 10, 100);
+        g.drawString("Shift: Sprint", 10, 120);
+
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist != null) {
+            g.setColor(new Color(145, 220, 255));
+            g.drawString("Plaques: " + protagonist.getArmorPlates(), 10, 140);
+            g.setColor(Color.WHITE);
+        }
+
+        if (GameMode.current == GameMode.ARCADE) {
+            g.setColor(new Color(255, 215, 110));
+            g.drawString("Arcade: vague " + (arcadeWaveIndex + 1), 10, 165);
+            g.drawString("Renforts dans: " + Math.max(0, arcadeWaveTimer / TARGET_UPS) + "s", 10, 185);
+            g.setColor(Color.WHITE);
+        }
 
         if (GameMode.current == GameMode.PROTECTION) {
-            Protagonist protagonist = ObjectManager.getProtagonist();
             if (protagonist != null) {
                 double distanceToExtraction = Math.max(0, getExtractionX() - protagonist.x);
                 g.setColor(new Color(255, 231, 133));
-                g.drawString("Protection: escorte jusqu'a la zone d'extraction", 10, 125);
-                g.drawString("Distance extraction: " + (int) Math.round(distanceToExtraction) + " px", 10, 145);
-                g.drawString("Allies a proteger: " + (civils + soldats), 10, 165);
+                int baseY = GameMode.current == GameMode.ARCADE ? 210 : 165;
+                g.drawString("Protection: escorte jusqu'a la zone d'extraction", 10, baseY);
+                g.drawString("Distance extraction: " + (int) Math.round(distanceToExtraction) + " px", 10, baseY + 20);
+                g.drawString("Allies a proteger: " + (civils + soldats), 10, baseY + 40);
             }
+        }
+    }
+
+    private void drawArcadeOverlay(Graphics2D g2d) {
+        if (screenFlashAlpha > 0f) {
+            Composite oldComposite = g2d.getComposite();
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, screenFlashAlpha));
+            g2d.setColor(screenFlashColor);
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+            g2d.setComposite(oldComposite);
+        }
+
+        if (GameMode.current == GameMode.ARCADE && screenState == ScreenState.PLAYING && arcadeWaveBannerTimer > 0) {
+            Font oldFont = g2d.getFont();
+            float alpha = Math.min(1f, arcadeWaveBannerTimer / (float) ARCADE_WAVE_BANNER_FRAMES);
+            Composite oldComposite = g2d.getComposite();
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.28f + alpha * 0.42f));
+            g2d.setColor(new Color(255, 142, 84));
+            g2d.fillRoundRect(getWidth() / 2 - 160, 28, 320, 48, 18, 18);
+            g2d.setComposite(oldComposite);
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(oldFont.deriveFont(Font.BOLD, 24f));
+            String label = "VAGUE " + arcadeWaveIndex;
+            FontMetrics fm = g2d.getFontMetrics();
+            g2d.drawString(label, (getWidth() - fm.stringWidth(label)) / 2, 59);
+            g2d.setFont(oldFont);
         }
     }
 
@@ -898,6 +1073,7 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
+        drawButton(g2d, getArcadeModeButtonBounds(), "Mode Arcade");
         drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
         drawButton(g2d, getProtectionModeButtonBounds(), "Mode Protection");
         drawButton(g2d, getOptionsButtonBounds(), "Options");
@@ -1018,13 +1194,20 @@ public class GamePanel extends JPanel implements Runnable {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         var old = g2d.getTransform();
-        g2d.translate(-tileManager.getCameraX(), -tileManager.getCameraY());
+        int shakeX = 0;
+        int shakeY = 0;
+        if (screenShakeFrames > 0 && screenState == ScreenState.PLAYING) {
+            shakeX = (int) Math.round((Math.random() * 2.0 - 1.0) * screenShakeAmplitude);
+            shakeY = (int) Math.round((Math.random() * 2.0 - 1.0) * screenShakeAmplitude);
+        }
+        g2d.translate(-tileManager.getCameraX() + shakeX, -tileManager.getCameraY() + shakeY);
         tileManager.draw(g2d);
         drawExtractionZone(g2d);
         ObjectManager.drawAll(g2d);
         g2d.setTransform(old);
 
         drawNightOverlay(g2d);
+        drawArcadeOverlay(g2d);
 
         if (screenState == ScreenState.PLAYING) {
             drawUI(g);
@@ -1048,6 +1231,25 @@ public class GamePanel extends JPanel implements Runnable {
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setColor(Color.WHITE);
         g.drawString("Score: " + score, 10, 20);
+    }
+
+    public static void triggerScreenShake(int frames, double amplitude) {
+        if (activePanel == null) {
+            return;
+        }
+
+        activePanel.screenShakeFrames = Math.max(activePanel.screenShakeFrames, frames);
+        activePanel.screenShakeAmplitude = Math.max(activePanel.screenShakeAmplitude, amplitude);
+    }
+
+    public static void triggerScreenFlash(Color color, float alpha, int frames) {
+        if (activePanel == null) {
+            return;
+        }
+
+        activePanel.screenFlashColor = color;
+        activePanel.screenFlashAlpha = Math.max(activePanel.screenFlashAlpha, alpha);
+        activePanel.screenFlashFrames = Math.max(activePanel.screenFlashFrames, frames);
     }
 
 }

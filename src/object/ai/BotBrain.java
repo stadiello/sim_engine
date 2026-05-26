@@ -1,11 +1,18 @@
 package object.ai;
 
+import main.GameMode;
 import object.Ennemi;
 import object.Homme;
 import object.ObjectManager;
 import object.weapon.Weapon;
 
 public class BotBrain {
+
+    private static final double ARCADE_CHASE_SPEED_MULTIPLIER = 1.16;
+    private static final double ARCADE_PUSH_BONUS = 0.10;
+    private static final double ARCADE_COVER_THRESHOLD_DELTA = 0.14;
+    private static final double ARCADE_VELOCITY_BLEND_BONUS = 0.10;
+    private static final double ARCADE_AIM_ERROR_SCALE = 0.90;
 
     private static final double CHASE_SPEED = 1.9; // Vitesse de déplacement de base de l'ennemi lorsqu'il poursuit une cible, utilisée pour calculer la vélocité désirée. La vitesse réelle peut être réduite par les obstacles et les ajustements de mouvement tactique.
     private static final double AGGRESSIVE_PUSH_FACTOR = 1.03; // Facteur de poussée pour les armes à courte portée comme le shotgun, pour les rendre un peu plus agressifs et éviter qu'ils ne restent à distance optimale sans jamais s'approcher. Un nombre légèrement supérieur à 1.0 encourage les ennemis à se rapprocher un peu plus que la distance optimale, ce qui est souvent nécessaire pour les armes à courte portée afin d'être efficaces.
@@ -27,6 +34,8 @@ public class BotBrain {
     private static final double FLANK_MIN_RANGE = 120.0;
     private static final double FLANK_SIDE_OFFSET = 132.0;
     private static final double FLANK_BACK_OFFSET = 56.0;
+    private static final double COVER_PEEK_OFFSET = 15.0;
+    private static final int COVER_PEEK_MEMORY_FRAMES = 26;
 
     private int shootCooldown = 0;
     private int losCheckCooldown = 0;
@@ -48,6 +57,8 @@ public class BotBrain {
     private double flankX;
     private double flankY;
     private int flankDirectionSign = 0;
+    private int coverPeekSideSign = 0;
+    private int coverPeekMemoryTimer = 0;
 
     public void update(Ennemi enemy) {
         enemy.tickSuppression();
@@ -76,13 +87,15 @@ public class BotBrain {
 
         if (focusedTarget != target) {
             focusedTarget = target;
-            reactionDelayTimer = AiTuning.getEnemyReactionFrames();
-            aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+            reactionDelayTimer = getEnemyReactionFrames();
+            aimSettleTimer = getEnemyAimStabilizationFrames();
             burstShotsRemaining = 0;
             burstPauseTimer = 0;
             suppressiveFireTimer = 0;
             suppressiveRearminTimer = 0;
             clearFlank();
+            coverPeekMemoryTimer = 0;
+            coverPeekSideSign = 0;
         }
 
         double dx = target.x - enemy.x;
@@ -118,7 +131,7 @@ public class BotBrain {
                 aimSettleTimer--;
             }
         } else {
-            aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+            aimSettleTimer = getEnemyAimStabilizationFrames();
             double suppressiveChance = enemy.isHeavy() ? 0.075 : enemy.isBreacher() ? 0.055 : enemy.isFlanker() ? 0.030 : 0.035;
             if (suppressionStage <= 2
                     && dist <= engageRange * 1.1
@@ -145,6 +158,9 @@ public class BotBrain {
                         1,
                         BURST_PAUSE_MIN_FRAMES + 2 + rolePauseDelta + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1))
                 );
+                if (isArcadeMode()) {
+                    burstPauseTimer = Math.max(1, burstPauseTimer - 2);
+                }
             }
         }
 
@@ -169,6 +185,12 @@ public class BotBrain {
             clearCover();
         }
 
+        if (coverPeekMemoryTimer > 0) {
+            coverPeekMemoryTimer--;
+        } else {
+            coverPeekSideSign = 0;
+        }
+
         if (hasLineOfSight && dist <= engageRange) {
             applyCombatMovement(enemy, dx, dy, invDist, dist, retreatRange, optimalRange);
 
@@ -177,15 +199,18 @@ public class BotBrain {
                 enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
                 enemy.onShot();
                 shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
-                aimSettleTimer = AiTuning.getEnemyAimStabilizationFrames();
+                aimSettleTimer = getEnemyAimStabilizationFrames();
                 consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
             }
             return;
         }
 
         clearCover();
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
+        double moveSpeed = getChaseSpeed() * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
         double pushFactor = weapon.isShotgun() ? AGGRESSIVE_PUSH_FACTOR : 1.0;
+        if (isArcadeMode()) {
+            pushFactor += ARCADE_PUSH_BONUS;
+        }
         if (enemy.isHeavy()) {
             pushFactor += 0.18;
         } else if (enemy.isBreacher()) {
@@ -237,13 +262,16 @@ public class BotBrain {
         int cooldownFrames = Math.max(1, weapon.getCooldownFrames());
         double ratio = shootCooldown / (double) cooldownFrames;
         double threshold = Math.max(0.08, COVER_SEARCH_MIN_COOLDOWN_RATIO - suppressionBonus * 0.22 - suppressionStage * 0.06);
+        if (isArcadeMode()) {
+            threshold = Math.max(0.08, threshold - ARCADE_COVER_THRESHOLD_DELTA);
+        }
         threshold += enemy.isHeavy() ? 0.30 : enemy.isBreacher() ? 0.20 : enemy.isFlanker() ? 0.08 : 0.0;
         double engageWindow = suppressionStage >= 3 ? weapon.getAiEngageRange() * 1.15 : weapon.getAiEngageRange();
         return ratio >= threshold && dist <= engageWindow * roleCoverBias;
     }
 
     private boolean moveToCover(Ennemi enemy, Homme target, double preferredRange) {
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier();
+        double moveSpeed = getChaseSpeed() * enemy.getSuppressionMoveMultiplier();
 
         if (coverMemoryTimer <= 0 || !TacticalMovement.hasLineOfSight(enemy.x, enemy.y, coverX, coverY)) {
             double[] cover = TacticalMovement.findCoverPoint(
@@ -270,6 +298,8 @@ public class BotBrain {
         double coverDistSq = toCoverX * toCoverX + toCoverY * toCoverY;
         if (coverDistSq <= 12.0 * 12.0) {
             applySmoothedVelocity(enemy, 0, 0);
+            enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
+            tryFireFromCoverPeek(enemy, target);
             return true;
         }
 
@@ -280,6 +310,82 @@ public class BotBrain {
         applySmoothedVelocity(enemy, adjusted[0], adjusted[1]);
         enemy.setFacingDirection(target.x - enemy.x, target.y - enemy.y);
         return true;
+    }
+
+    private void tryFireFromCoverPeek(Ennemi enemy, Homme target) {
+        if (shootCooldown > 0 || burstPauseTimer > 0) {
+            return;
+        }
+
+        double toTargetX = target.x - enemy.x;
+        double toTargetY = target.y - enemy.y;
+        double distSq = toTargetX * toTargetX + toTargetY * toTargetY;
+        if (distSq <= EPSILON_DIST_SQ) {
+            return;
+        }
+
+        double invDist = 1.0 / Math.sqrt(distSq);
+        double dirX = toTargetX * invDist;
+        double dirY = toTargetY * invDist;
+        double perpX = -dirY;
+        double perpY = dirX;
+
+        int preferredSide = coverPeekSideSign == 0 ? (Math.random() < 0.5 ? -1 : 1) : coverPeekSideSign;
+        int[] sideOrder = {preferredSide, -preferredSide};
+
+        double bestOriginX = 0;
+        double bestOriginY = 0;
+        int bestSide = 0;
+
+        for (int sideSign : sideOrder) {
+            double candidateX = enemy.x + perpX * sideSign * COVER_PEEK_OFFSET;
+            double candidateY = enemy.y + perpY * sideSign * COVER_PEEK_OFFSET;
+            if (!TacticalMovement.hasLineOfSight(enemy.x, enemy.y, candidateX, candidateY)) {
+                continue;
+            }
+            if (!TacticalMovement.hasLineOfSight(candidateX, candidateY, target.x, target.y)) {
+                continue;
+            }
+
+            bestOriginX = candidateX;
+            bestOriginY = candidateY;
+            bestSide = sideSign;
+            break;
+        }
+
+        if (bestSide == 0) {
+            return;
+        }
+
+        coverPeekSideSign = bestSide;
+        coverPeekMemoryTimer = COVER_PEEK_MEMORY_FRAMES;
+
+        int suppressionStage = enemy.getSuppressionStage();
+        if (!canFireInCurrentBurst(enemy, enemy.getCarriedWeapon(), suppressionStage)) {
+            return;
+        }
+
+        double shotDx = target.x - bestOriginX;
+        double shotDy = target.y - bestOriginY;
+        double shotDist = Math.hypot(shotDx, shotDy);
+        if (shotDist <= 0.0001) {
+            return;
+        }
+
+        double[] shotDir = applyAimError(
+                enemy,
+                shotDx / shotDist,
+                shotDy / shotDist,
+                shotDist,
+                suppressionStage,
+                enemy.getSuppressionLevel()
+        );
+
+        enemy.getCarriedWeapon().fire(enemy, bestOriginX, bestOriginY, shotDir[0], shotDir[1]);
+        enemy.onShot();
+        shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
+        aimSettleTimer = Math.max(1, AiTuning.getEnemyAimStabilizationFrames() / 2);
+        consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
     }
 
     private boolean tryMoveToFlank(
@@ -314,6 +420,9 @@ public class BotBrain {
         }
 
         double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * 1.08;
+        if (isArcadeMode()) {
+            moveSpeed *= ARCADE_CHASE_SPEED_MULTIPLIER;
+        }
         double invDist = 1.0 / Math.sqrt(flankDistSq);
         double desiredVx = toFlankX * invDist * moveSpeed;
         double desiredVy = toFlankY * invDist * moveSpeed;
@@ -408,7 +517,7 @@ public class BotBrain {
     ) {
         int suppressionStage = enemy.getSuppressionStage();
         double suppressionLevel = enemy.getSuppressionLevel();
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
+        double moveSpeed = getChaseSpeed() * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy);
 
         if (strafeSwitchTimer <= 0) {
             int baseSwitch = suppressionStage >= 2 ? 16 : 24;
@@ -497,7 +606,7 @@ public class BotBrain {
         double sideSign = Math.random() < 0.5 ? -1 : 1;
         double perpX = -dirY * sideSign;
         double perpY = dirX * sideSign;
-        double moveSpeed = CHASE_SPEED * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy) * 0.85;
+        double moveSpeed = getChaseSpeed() * enemy.getSuppressionMoveMultiplier() * getRoleSpeedMultiplier(enemy) * 0.85;
 
         double rawVx = (dirX * panicFactor + perpX * jitterFactor) * moveSpeed;
         double rawVy = (dirY * panicFactor + perpY * jitterFactor) * moveSpeed;
@@ -507,6 +616,8 @@ public class BotBrain {
 
     private void clearCover() {
         coverMemoryTimer = 0;
+        coverPeekMemoryTimer = 0;
+        coverPeekSideSign = 0;
     }
 
     private void clearFlank() {
@@ -607,8 +718,9 @@ public class BotBrain {
     }
 
     private void applySmoothedVelocity(Ennemi enemy, double desiredVx, double desiredVy) {
-        enemy.vx = enemy.vx * (1.0 - VELOCITY_BLEND) + desiredVx * VELOCITY_BLEND;
-        enemy.vy = enemy.vy * (1.0 - VELOCITY_BLEND) + desiredVy * VELOCITY_BLEND;
+        double blend = getVelocityBlend();
+        enemy.vx = enemy.vx * (1.0 - blend) + desiredVx * blend;
+        enemy.vy = enemy.vy * (1.0 - blend) + desiredVy * blend;
         if (Math.abs(enemy.vx) < 0.01) {
             enemy.vx = 0;
         }
@@ -625,7 +737,7 @@ public class BotBrain {
         double suppressionPenalty = enemy.isSuppressed()
                 ? (suppressionStage >= 3 ? 4.0 : suppressionStage == 2 ? 2.8 : 1.6) * suppressionLevel
                 : 0.0;
-        double maxErrorRad = Math.toRadians(baseErrorDeg + movementPenalty + suppressionPenalty);
+        double maxErrorRad = Math.toRadians((baseErrorDeg + movementPenalty + suppressionPenalty) * (isArcadeMode() ? ARCADE_AIM_ERROR_SCALE : 1.0));
 
         double randomAngle = (Math.random() * 2.0 - 1.0) * maxErrorRad;
         double cos = Math.cos(randomAngle);
@@ -639,5 +751,27 @@ public class BotBrain {
         }
 
         return new double[]{outX / len, outY / len};
+    }
+
+    private boolean isArcadeMode() {
+        return GameMode.current == GameMode.ARCADE;
+    }
+
+    private int getEnemyReactionFrames() {
+        int base = AiTuning.getEnemyReactionFrames();
+        return isArcadeMode() ? Math.max(2, base - 4) : base;
+    }
+
+    private int getEnemyAimStabilizationFrames() {
+        int base = AiTuning.getEnemyAimStabilizationFrames();
+        return isArcadeMode() ? Math.max(1, base - 2) : base;
+    }
+
+    private double getChaseSpeed() {
+        return CHASE_SPEED * (isArcadeMode() ? ARCADE_CHASE_SPEED_MULTIPLIER : 1.0);
+    }
+
+    private double getVelocityBlend() {
+        return Math.min(0.7, VELOCITY_BLEND + (isArcadeMode() ? ARCADE_VELOCITY_BLEND_BONUS : 0.0));
     }
 }
