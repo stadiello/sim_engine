@@ -10,6 +10,7 @@ import main.GameMode;
 import main.GamePanel;
 import main.Utils;
 import object.Douille;
+import object.Ennemi;
 import object.Homme;
 import object.ObjectManager;
 import object.Projectile;
@@ -113,10 +114,28 @@ public final class Weapon {
             0,
             false,
             false,
-            FireSound.NONE,
+            FireSound.GRENADE,
             1,
             2,
             90);
+
+            private static final Weapon ROCKET_LAUNCHER = new Weapon(
+                "Lance-roquettes",
+                "/assets/armes/rocket_launcher.png",
+                Projectile.ProjectileType.ROCKET,
+                95,
+                8.8,
+                14,
+                40,
+                8,
+                -28,
+                10,
+                false,
+                false,
+                FireSound.GRENADE,
+                1,
+                5,
+                115);
 
     private static final Weapon MINIGUN = new Weapon(
             "Minigun",
@@ -124,11 +143,11 @@ public final class Weapon {
             Projectile.ProjectileType.BULLET,
             2,
             24,
-            10,
-            34,
-            -26,
-            12,
-            14,
+                14,
+                42,
+                10,
+                -28,
+                10,
             true,
             true,
             FireSound.SMG,
@@ -158,6 +177,10 @@ public final class Weapon {
 
     public static Weapon minigun() {
         return MINIGUN.copy();
+    }
+
+    public static Weapon rocketLauncher() {
+        return ROCKET_LAUNCHER.copy();
     }
 
     public static Weapon[] protagonistLoadout() {
@@ -296,6 +319,10 @@ public final class Weapon {
         return "Minigun".equals(name);
     }
 
+    public boolean isRocketLauncher() {
+        return "Lance-roquettes".equals(name);
+    }
+
     public boolean isAutomatic() {
         return automatic;
     }
@@ -321,6 +348,9 @@ public final class Weapon {
     }
 
     public boolean canReload() {
+        if (GamePanel.isUnlimitedAmmoEnabled()) {
+            return false;
+        }
         return ammoInMagazine < magazineCapacity && reserveAmmo > 0;
     }
 
@@ -375,6 +405,9 @@ public final class Weapon {
         if (isMinigun()) {
             return 255.0;
         }
+        if (isRocketLauncher()) {
+            return 330.0;
+        }
         if (isShotgun()) {
             return 120.0;
         }
@@ -405,7 +438,8 @@ public final class Weapon {
             return false;
         }
 
-        if (shooter instanceof Protagonist) {
+        boolean usesAmmo = shooter instanceof Protagonist || shooter instanceof Ennemi;
+        if (usesAmmo && !GamePanel.isUnlimitedAmmoEnabled()) {
             if (ammoInMagazine <= 0) {
                 return false;
             }
@@ -417,8 +451,8 @@ public final class Weapon {
         double projectileSpeedValue = getProjectileSpeed();
         double[] muzzleOrigin = getMuzzleOrigin(originX, originY, dirX, dirY);
 
-        if (GameMode.current == GameMode.ARCADE) {
-            triggerArcadeFireFeedback();
+        if (GamePanel.isFireCameraFeedbackEnabled()) {
+            triggerFireFeedback();
         }
 
         if (projectileType == Projectile.ProjectileType.SHOTGUN_PELLET) {
@@ -493,21 +527,29 @@ public final class Weapon {
         }
     }
 
-    private void triggerArcadeFireFeedback() {
+    private void triggerFireFeedback() {
         if (projectileType == Projectile.ProjectileType.GRENADE) {
             GamePanel.triggerScreenShake(10, 5.0);
             GamePanel.triggerScreenFlash(new Color(255, 226, 180), 0.12f, 5);
             return;
         }
+
+        double shakeScale = GameMode.current == GameMode.ARCADE ? 1.0 : 0.7;
+        float flashScale = GameMode.current == GameMode.ARCADE ? 1.0f : 0.65f;
+
         if (isShotgun()) {
-            GamePanel.triggerScreenShake(6, 3.0);
-            GamePanel.triggerScreenFlash(new Color(255, 232, 190), 0.08f, 4);
+            GamePanel.triggerScreenShake(6, 3.0 * shakeScale);
+            GamePanel.triggerScreenFlash(new Color(255, 232, 190), 0.08f * flashScale, 4);
             return;
         }
         if (isAutomatic()) {
-            GamePanel.triggerScreenShake(3, 1.2);
-            GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.03f, 2);
+            GamePanel.triggerScreenShake(3, 1.2 * shakeScale);
+            GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.03f * flashScale, 2);
+            return;
         }
+
+        GamePanel.triggerScreenShake(2, 0.9 * shakeScale);
+        GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.02f * flashScale, 2);
     }
 
     private double[] getMuzzleOrigin(double originX, double originY, double dirX, double dirY) {
@@ -529,6 +571,9 @@ public final class Weapon {
         if (isMinigun()) {
             return base + 2.0;
         }
+        if (isRocketLauncher()) {
+            return base + 5.0;
+        }
         if (projectileType == Projectile.ProjectileType.GRENADE) {
             return base + 1.0;
         }
@@ -542,6 +587,9 @@ public final class Weapon {
         }
         if (isMinigun()) {
             return centerY - 1.0;
+        }
+        if (isRocketLauncher()) {
+            return centerY + 1.0;
         }
         if (projectileType == Projectile.ProjectileType.GRENADE) {
             return centerY + 0.5;

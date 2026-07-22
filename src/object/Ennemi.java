@@ -17,13 +17,15 @@ public class Ennemi extends Homme {
         STANDARD,
         FLANQUEUR,
         ASSAUT,
-        LOURD
+        LOURD,
+        ROQUETTE
     }
 
     private static final double MAX_TURN_PER_FRAME_RAD = Math.toRadians(10.0);
 
     private static Image imgEnnemi;
     private static Image imgEnnemiLourd;
+    private static Image imgEnnemiRoquette;
 
     static {
         try {
@@ -34,6 +36,10 @@ public class Ennemi extends Homme {
             var heavyStream = Ennemi.class.getResourceAsStream("/assets/badGuys/ennemi_lourd.png");
             if (heavyStream != null) {
                 imgEnnemiLourd = ImageIO.read(heavyStream);
+            }
+            var rocketStream = Ennemi.class.getResourceAsStream("/assets/badGuys/ennemi_roquette.png");
+            if (rocketStream != null) {
+                imgEnnemiRoquette = ImageIO.read(rocketStream);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -69,6 +75,7 @@ public class Ennemi extends Homme {
             case FLANQUEUR -> r < 0.70 ? Weapon.glock() : Weapon.carabine();
             case ASSAUT -> r < 0.72 ? Weapon.shotgun() : Weapon.carabine();
             case LOURD -> Weapon.minigun();
+            case ROQUETTE -> Weapon.rocketLauncher();
             case STANDARD -> {
                 if (r < 0.50) {
                     yield Weapon.glock();
@@ -196,6 +203,10 @@ public class Ennemi extends Homme {
         return archetype == EnemyArchetype.LOURD;
     }
 
+    public boolean isRocketeer() {
+        return archetype == EnemyArchetype.ROQUETTE;
+    }
+
     public boolean absorbFrontHit(double projectileVx, double projectileVy) {
         if (!isHeavy() || frontArmor <= 0) {
             return false;
@@ -236,7 +247,9 @@ public class Ennemi extends Homme {
         var old = g2d.getTransform();
 
         g2d.rotate(angle, x, y);
-        Image bodyImage = isHeavy() && imgEnnemiLourd != null ? imgEnnemiLourd : imgEnnemi;
+        Image bodyImage = isRocketeer() && imgEnnemiRoquette != null
+            ? imgEnnemiRoquette
+            : (isHeavy() && imgEnnemiLourd != null ? imgEnnemiLourd : imgEnnemi);
         g2d.drawImage(bodyImage, (int) x - 16, (int) y - 16, 32, 42, null);
 
         if (archetype != EnemyArchetype.STANDARD) {
@@ -244,6 +257,7 @@ public class Ennemi extends Homme {
                 case FLANQUEUR -> new Color(226, 196, 110);
                 case ASSAUT -> new Color(206, 92, 92);
                 case LOURD -> new Color(120, 180, 205);
+                case ROQUETTE -> new Color(255, 148, 94);
                 default -> new Color(220, 220, 220);
             };
             g2d.setColor(tagColor);
@@ -263,6 +277,14 @@ public class Ennemi extends Homme {
             g2d.fillRect((int) x - 6, (int) y - 24, 12, 2);
             g2d.setColor(new Color(134, 198, 224));
             g2d.fillRect((int) x - 6, (int) y - 24, armorBar, 2);
+        }
+
+        if (isRocketeer()) {
+            g2d.setColor(new Color(60, 66, 72));
+            g2d.fillRoundRect((int) x - 12, (int) y - 18, 9, 26, 4, 4);
+            g2d.setColor(new Color(228, 146, 88));
+            g2d.drawRoundRect((int) x - 12, (int) y - 18, 9, 26, 4, 4);
+            g2d.fillRect((int) x - 10, (int) y - 16, 5, 4);
         }
 
         carriedWeapon.draw(g2d, x, y, shotAnimTimer, shotAnimTimer > 0);

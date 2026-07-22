@@ -69,7 +69,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int ALIEN_RESPAWN_COOLDOWN_FRAMES = TARGET_UPS * 2;
     private static final int AI_OPTIONS_BASE_Y = 292;
     private static final int AI_OPTION_ROW_GAP = 34;
-    private static final int AI_OPTION_COUNT = 9;
+    private static final int AI_OPTION_COUNT = 11;
     private static final int MENU_MAP_CARD_GAP = 26;
     private static final float NIGHT_DARKNESS_ALPHA = 0.86f;
     private static final double PLAYER_FLASHLIGHT_RANGE = 320;
@@ -95,6 +95,8 @@ public class GamePanel extends JPanel implements Runnable {
     private Color screenFlashColor = new Color(255, 236, 160);
     private float screenFlashAlpha = 0f;
     private int alienRespawnCooldownFrames = 0;
+    private static boolean unlimitedAmmoEnabled = false;
+    private static boolean fireCameraFeedbackEnabled = true;
     private int missionRotationIndex = 0;
     private MissionType activeMissionType;
     private String activeMissionTitle = "";
@@ -239,6 +241,9 @@ public class GamePanel extends JPanel implements Runnable {
         }
         if (ratio < 0.94) {
             return EnemyArchetype.ASSAUT;
+        }
+        if (ratio < 0.98) {
+            return EnemyArchetype.ROQUETTE;
         }
         return EnemyArchetype.LOURD;
     }
@@ -930,10 +935,13 @@ public class GamePanel extends JPanel implements Runnable {
             return index % 3 == 0 ? EnemyArchetype.ASSAUT : EnemyArchetype.FLANQUEUR;
         }
         if (pressure < 5.0) {
-            return index % 4 == 0 ? EnemyArchetype.LOURD : EnemyArchetype.ASSAUT;
+            return index % 5 == 0 ? EnemyArchetype.ROQUETTE : (index % 4 == 0 ? EnemyArchetype.LOURD : EnemyArchetype.ASSAUT);
         }
         if (index % 5 == 0) {
             return EnemyArchetype.LOURD;
+        }
+        if (index % 7 == 0) {
+            return EnemyArchetype.ROQUETTE;
         }
         return index % 2 == 0 ? EnemyArchetype.FLANQUEUR : EnemyArchetype.ASSAUT;
     }
@@ -1148,9 +1156,19 @@ public class GamePanel extends JPanel implements Runnable {
                     ObjectManager.clearAlienAggro();
                 }
             }
+            case 9 -> unlimitedAmmoEnabled = !unlimitedAmmoEnabled;
+            case 10 -> fireCameraFeedbackEnabled = !fireCameraFeedbackEnabled;
             default -> {
             }
         }
+    }
+
+    public static boolean isUnlimitedAmmoEnabled() {
+        return unlimitedAmmoEnabled;
+    }
+
+    public static boolean isFireCameraFeedbackEnabled() {
+        return fireCameraFeedbackEnabled;
     }
 
     private Rectangle getReplayButtonBounds() {
@@ -1787,6 +1805,8 @@ public class GamePanel extends JPanel implements Runnable {
         drawAiOptionRow(g2d, 6, "Suppression bonus couverture", String.format("%.2f", AiTuning.getSuppressionCoverBoost()));
         drawAiOptionRow(g2d, 7, "Suppression rayon (px)", Integer.toString((int) Math.round(AiTuning.getSuppressionNearMissRadius())));
         drawAiOptionRow(g2d, 8, "Aliens meute agressive", AiTuning.isAlienPackAggroEnabled() ? "ON" : "OFF");
+        drawAiOptionRow(g2d, 9, "Munitions illimitees", unlimitedAmmoEnabled ? "ON" : "OFF");
+        drawAiOptionRow(g2d, 10, "Feedback camera des tirs", fireCameraFeedbackEnabled ? "ON" : "OFF");
 
         drawButton(g2d, getBackButtonBounds(), "Retour");
         g2d.setFont(oldFont);

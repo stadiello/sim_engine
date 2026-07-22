@@ -20,20 +20,27 @@ public class Projectile extends GameObject {
     private static final double GRENADE_BLAST_RADIUS = 72.0;
     private static final int GRENADE_FUSE_FRAMES = 180;
     private static final int GRENADE_SPARK_COUNT = 3;
+    private static final double ROCKET_RADIUS = 8.0;
+    private static final double ROCKET_BLAST_RADIUS = 110.0;
+    private static final int ROCKET_SPARK_COUNT = 10;
     private static final Color METAL_IMPACT_CORE = new Color(255, 236, 180);
     private static final Color METAL_IMPACT_EMBER = new Color(255, 140, 84);
     private static final Color FLESH_IMPACT_CORE = new Color(255, 196, 118);
     private static final Color FLESH_IMPACT_EMBER = new Color(255, 86, 68);
+    private static final Color ROCKET_FIRE_CORE = new Color(255, 224, 160);
+    private static final Color ROCKET_FIRE_EMBER = new Color(255, 110, 72);
 
     private static Image imgShot;
     private static Image imgBullet;
     private static Image imgShotgunPellet;
+    private static Image imgRocket;
 
     public enum ProjectileType {
         DEFAULT,
         BULLET,
         SHOTGUN_PELLET,
-        GRENADE
+        GRENADE,
+        ROCKET
     }
 
     static {
@@ -42,6 +49,7 @@ public class Projectile extends GameObject {
             imgBullet = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/bullet.png"));
             // Utilise le shot_effect pour les pellets aussi (ou créer une image spécifique)
             imgShotgunPellet = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/bullet.png"));
+            imgRocket = ImageIO.read(Projectile.class.getResourceAsStream("/assets/effets/rocket.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -65,6 +73,10 @@ public class Projectile extends GameObject {
     public void update() {
         if (type == ProjectileType.GRENADE) {
             updateGrenade();
+            return;
+        }
+        if (type == ProjectileType.ROCKET) {
+            updateRocket();
             return;
         }
 
@@ -225,6 +237,42 @@ public class Projectile extends GameObject {
         }
     }
 
+    private void updateRocket() {
+        double previousX = x;
+        double previousY = y;
+        x += vx;
+        y += vy;
+
+        if (!canMoveTo(x, y, ROCKET_RADIUS)) {
+            explodeRocket();
+            return;
+        }
+
+        for (Homme homme : ObjectManager.getLivingHumans()) {
+            if (homme == tireur) {
+                continue;
+            }
+
+            if (!areHostile(tireur, homme)) {
+                continue;
+            }
+
+            double distSq = distancePointToSegmentSquared(homme.x, homme.y, previousX, previousY, x, y);
+            if (distSq < 20 * 20) {
+                explodeRocket();
+                return;
+            }
+        }
+
+        vie--;
+        TileManager tileManager = ObjectManager.getTileManager();
+        double maxX = tileManager != null ? tileManager.getWorldWidth() : 800;
+        double maxY = tileManager != null ? tileManager.getWorldHeight() : 600;
+        if (vie <= 0 || x < 0 || x > maxX || y < 0 || y > maxY) {
+            explodeRocket();
+        }
+    }
+
     private void explode() {
         Utils.playGrenadeSound();
 
@@ -253,6 +301,33 @@ public class Projectile extends GameObject {
         ObjectManager.list.remove(this);
     }
 
+    private void explodeRocket() {
+        Utils.playGrenadeSound();
+
+        TileManager tileManager = ObjectManager.getTileManager();
+        if (tileManager != null) {
+            tileManager.damageTilesInRadius(x, y, ROCKET_BLAST_RADIUS, 3);
+        }
+
+        for (int i = 0; i < ROCKET_SPARK_COUNT; i++) {
+            ObjectManager.list.add(new ImpactSpark(
+                    x,
+                    y,
+                    Math.random() * 2.0 - 1.0,
+                    Math.random() * 2.0 - 1.0,
+                    2.3,
+                    ROCKET_FIRE_CORE,
+                    ROCKET_FIRE_EMBER));
+        }
+
+                ObjectManager.list.add(new RocketBlastCloud(x, y, ROCKET_BLAST_RADIUS));
+        ObjectManager.list.add(new Shockwave(x, y, tireur, ROCKET_BLAST_RADIUS));
+        ObjectManager.list.add(new Shockwave(x, y, tireur, ROCKET_BLAST_RADIUS * 0.62));
+        GamePanel.triggerScreenShake(18, 8.5);
+        GamePanel.triggerScreenFlash(new Color(255, 152, 86), 0.28f, 10);
+        ObjectManager.list.remove(this);
+    }
+
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
         if (type == ProjectileType.GRENADE) {
@@ -264,6 +339,22 @@ public class Projectile extends GameObject {
             g2d.drawOval((int) Math.round(x - GRENADE_RADIUS), (int) Math.round(y - GRENADE_RADIUS), 14, 14);
             g2d.setColor(new Color(180, 200, 120));
             g2d.drawLine((int) Math.round(x), (int) Math.round(y - 6), (int) Math.round(x + 3), (int) Math.round(y - 12));
+            g2d.setTransform(old);
+            return;
+        }
+        if (type == ProjectileType.ROCKET) {
+            var old = g2d.getTransform();
+            g2d.rotate(angle, x, y);
+            if (imgRocket != null) {
+                g2d.drawImage(imgRocket, (int) Math.round(x - 6), (int) Math.round(y - 14), 12, 28, null);
+            } else {
+                g2d.setColor(new Color(92, 102, 112));
+                g2d.fillRoundRect((int) Math.round(x - 4), (int) Math.round(y - 12), 8, 20, 3, 3);
+                g2d.setColor(new Color(210, 104, 72));
+                g2d.fillOval((int) Math.round(x - 4), (int) Math.round(y - 14), 8, 8);
+            }
+            g2d.setColor(new Color(255, 198, 122, 210));
+            g2d.fillOval((int) Math.round(x - 3), (int) Math.round(y + 8), 6, 6);
             g2d.setTransform(old);
             return;
         }

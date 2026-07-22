@@ -6,6 +6,7 @@ import javax.imageio.ImageIO;
 
 import gameController.*;
 import main.GameMode;
+import main.Utils;
 import object.ai.TacticalMovement;
 import object.weapon.Weapon;
 import world.TileManager;
@@ -290,6 +291,7 @@ public class Protagonist extends Homme{
     private void startReloadIfPossible(Weapon weapon) {
         if (weapon != null && reloadTimer == 0 && weapon.canReload()) {
             reloadTimer = weapon.getReloadFrames();
+            Utils.playReloadSound();
         }
     }
 

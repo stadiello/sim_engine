@@ -1,6 +1,7 @@
 package object.ai;
 
 import main.GameMode;
+import main.Utils;
 import object.Ennemi;
 import object.Homme;
 import object.ObjectManager;
@@ -38,6 +39,7 @@ public class BotBrain {
     private static final int COVER_PEEK_MEMORY_FRAMES = 26;
 
     private int shootCooldown = 0;
+    private int reloadTimer = 0;
     private int losCheckCooldown = 0;
     private Homme losCachedTarget;
     private boolean losCachedVisible;
@@ -66,6 +68,12 @@ public class BotBrain {
         if (shootCooldown > 0) {
             shootCooldown--;
         }
+        if (reloadTimer > 0) {
+            reloadTimer--;
+            if (reloadTimer == 0) {
+                enemy.getCarriedWeapon().reload();
+            }
+        }
         if (burstPauseTimer > 0) {
             burstPauseTimer--;
         }
@@ -93,6 +101,7 @@ public class BotBrain {
             burstPauseTimer = 0;
             suppressiveFireTimer = 0;
             suppressiveRearminTimer = 0;
+            reloadTimer = 0;
             clearFlank();
             coverPeekMemoryTimer = 0;
             coverPeekSideSign = 0;
@@ -111,6 +120,10 @@ public class BotBrain {
         double invDist = 1.0 / Math.sqrt(distSq);
         double dist = 1.0 / invDist;
         Weapon weapon = enemy.getCarriedWeapon();
+        if (reloadTimer == 0 && weapon.getAmmoInMagazine() <= 0 && weapon.canReload()) {
+            startReload(weapon);
+        }
+
         double retreatRange = weapon.getAiRetreatRange();
         double optimalRange = weapon.getAiOptimalRange();
         double engageRange = weapon.getAiEngageRange();
@@ -148,18 +161,17 @@ public class BotBrain {
                 suppressiveRearminTimer = Math.max(42, rearminBase)
                         + (int) (Math.random() * (SUPPRESSIVE_REARM_MAX_FRAMES - SUPPRESSIVE_REARM_MIN_FRAMES + 1));
             }
-            if (suppressiveFireTimer > 0 && shootCooldown == 0 && burstPauseTimer == 0) {
+            if (suppressiveFireTimer > 0 && shootCooldown == 0 && burstPauseTimer == 0 && reloadTimer == 0) {
                 double[] shotDir = applySuppressiveSpread(dx * invDist, dy * invDist, suppressionStage, suppressionLevel);
-                enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
-                enemy.onShot();
-                shootCooldown = Math.max(1, enemy.getCarriedWeapon().getCooldownFrames() - 1);
-                int rolePauseDelta = enemy.isHeavy() ? -3 : enemy.isBreacher() ? -2 : 0;
-                burstPauseTimer = Math.max(
-                        1,
-                        BURST_PAUSE_MIN_FRAMES + 2 + rolePauseDelta + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1))
-                );
-                if (isArcadeMode()) {
-                    burstPauseTimer = Math.max(1, burstPauseTimer - 2);
+                if (fireEnemyWeapon(enemy, shotDir[0], shotDir[1])) {
+                    int rolePauseDelta = enemy.isHeavy() ? -3 : enemy.isBreacher() ? -2 : 0;
+                    burstPauseTimer = Math.max(
+                            1,
+                            BURST_PAUSE_MIN_FRAMES + 2 + rolePauseDelta + (int) (Math.random() * (BURST_PAUSE_MAX_FRAMES - BURST_PAUSE_MIN_FRAMES + 1))
+                    );
+                    if (isArcadeMode()) {
+                        burstPauseTimer = Math.max(1, burstPauseTimer - 2);
+                    }
                 }
             }
         }
@@ -194,13 +206,12 @@ public class BotBrain {
         if (hasLineOfSight && dist <= engageRange) {
             applyCombatMovement(enemy, dx, dy, invDist, dist, retreatRange, optimalRange);
 
-            if (shootCooldown == 0 && aimSettleTimer <= 0 && canFireInCurrentBurst(enemy, enemy.getCarriedWeapon(), suppressionStage)) {
+            if (shootCooldown == 0 && reloadTimer == 0 && aimSettleTimer <= 0 && canFireInCurrentBurst(enemy, enemy.getCarriedWeapon(), suppressionStage)) {
                 double[] shotDir = applyAimError(enemy, dx * invDist, dy * invDist, dist, suppressionStage, suppressionLevel);
-                enemy.getCarriedWeapon().fire(enemy, shotDir[0], shotDir[1]);
-                enemy.onShot();
-                shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
-                aimSettleTimer = getEnemyAimStabilizationFrames();
-                consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
+                if (fireEnemyWeapon(enemy, shotDir[0], shotDir[1])) {
+                    aimSettleTimer = getEnemyAimStabilizationFrames();
+                    consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
+                }
             }
             return;
         }
@@ -313,7 +324,7 @@ public class BotBrain {
     }
 
     private void tryFireFromCoverPeek(Ennemi enemy, Homme target) {
-        if (shootCooldown > 0 || burstPauseTimer > 0) {
+        if (shootCooldown > 0 || burstPauseTimer > 0 || reloadTimer > 0) {
             return;
         }
 
@@ -381,11 +392,47 @@ public class BotBrain {
                 enemy.getSuppressionLevel()
         );
 
-        enemy.getCarriedWeapon().fire(enemy, bestOriginX, bestOriginY, shotDir[0], shotDir[1]);
+        if (fireEnemyWeapon(enemy, bestOriginX, bestOriginY, shotDir[0], shotDir[1])) {
+            aimSettleTimer = Math.max(1, AiTuning.getEnemyAimStabilizationFrames() / 2);
+            consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
+        }
+    }
+
+    private boolean fireEnemyWeapon(Ennemi enemy, double dirX, double dirY) {
+        return fireEnemyWeapon(enemy, enemy.x, enemy.y, dirX, dirY);
+    }
+
+    private boolean fireEnemyWeapon(Ennemi enemy, double originX, double originY, double dirX, double dirY) {
+        Weapon weapon = enemy.getCarriedWeapon();
+        if (reloadTimer > 0) {
+            return false;
+        }
+
+        if (weapon.getAmmoInMagazine() <= 0) {
+            startReload(weapon);
+            return false;
+        }
+
+        if (!weapon.fire(enemy, originX, originY, dirX, dirY)) {
+            startReload(weapon);
+            return false;
+        }
+
         enemy.onShot();
-        shootCooldown = enemy.getCarriedWeapon().getCooldownFrames();
-        aimSettleTimer = Math.max(1, AiTuning.getEnemyAimStabilizationFrames() / 2);
-        consumeBurstShot(enemy, enemy.getCarriedWeapon(), suppressionStage);
+        shootCooldown = weapon.getCooldownFrames();
+        if (weapon.getAmmoInMagazine() <= 0 && weapon.canReload()) {
+            startReload(weapon);
+        }
+        return true;
+    }
+
+    private void startReload(Weapon weapon) {
+        if (weapon == null || reloadTimer > 0 || !weapon.canReload()) {
+            return;
+        }
+
+        reloadTimer = weapon.getReloadFrames();
+        Utils.playReloadSound();
     }
 
     private boolean tryMoveToFlank(
