@@ -49,3 +49,15 @@ Si besoin, supprimer les dossiers de build :
 ```bash
 rm -rf out dist release SimEngine.zip
 ```
+
+
+## Lancer le jeu sur macOS
+
+Accorder les permissions d'execution sur le fichier `SimEngine.app` :
+```bash
+xattr -d com.apple.quarantine "SimEngine.app"
+```
+Ouvrir le jeu :
+```bash
+open release/SimEngine.app
+```
