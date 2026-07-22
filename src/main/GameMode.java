@@ -4,7 +4,8 @@ public enum GameMode {
     FREE,
     ARCADE,
     STORY,
-    PROTECTION;
+    PROTECTION,
+    MISSION;
 
     public static GameMode current = FREE;
 }

@@ -1,8 +1,8 @@
 package object.weapon;
 
+import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.awt.Color;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
@@ -13,6 +13,7 @@ import object.Douille;
 import object.Homme;
 import object.ObjectManager;
 import object.Projectile;
+import object.Protagonist;
 
 public final class Weapon {
 
@@ -40,14 +41,17 @@ public final class Weapon {
             12,
             true,
             false,
-            FireSound.LASER);
+            FireSound.LASER,
+            24,
+            120,
+            75);
 
     private static final Weapon CARABINE = new Weapon(
             "Carabine",
             "/assets/armes/carabine.png",
             Projectile.ProjectileType.BULLET,
             4,
-            30, //6.5
+            30,
             5,
             30,
             5,
@@ -55,7 +59,10 @@ public final class Weapon {
             12,
             true,
             true,
-            FireSound.SMG);
+            FireSound.SMG,
+            30,
+            120,
+            100);
 
     private static final Weapon GLOCK = new Weapon(
             "Glock",
@@ -70,7 +77,10 @@ public final class Weapon {
             10,
             false,
             true,
-            FireSound.PISTOL);
+            FireSound.PISTOL,
+            17,
+            51,
+            80);
 
     private static final Weapon SHOTGUN = new Weapon(
             "Shotgun",
@@ -85,7 +95,10 @@ public final class Weapon {
             18,
             false,
             true,
-            FireSound.SHOTGUN);
+            FireSound.SHOTGUN,
+            8,
+            24,
+            105);
 
     private static final Weapon GRENADE = new Weapon(
             "Grenade",
@@ -100,7 +113,10 @@ public final class Weapon {
             0,
             false,
             false,
-            FireSound.NONE);
+            FireSound.NONE,
+            1,
+            2,
+            90);
 
     private static final Weapon MINIGUN = new Weapon(
             "Minigun",
@@ -115,30 +131,33 @@ public final class Weapon {
             14,
             true,
             true,
-            FireSound.SMG);
+            FireSound.SMG,
+            80,
+            240,
+            140);
 
     public static Weapon blaster() {
-        return BLASTER;
+        return BLASTER.copy();
     }
 
     public static Weapon carabine() {
-        return CARABINE;
+        return CARABINE.copy();
     }
 
     public static Weapon glock() {
-        return GLOCK;
+        return GLOCK.copy();
     }
 
     public static Weapon shotgun() {
-        return SHOTGUN;
+        return SHOTGUN.copy();
     }
 
     public static Weapon grenade() {
-        return GRENADE;
+        return GRENADE.copy();
     }
 
     public static Weapon minigun() {
-        return MINIGUN;
+        return MINIGUN.copy();
     }
 
     public static Weapon[] protagonistLoadout() {
@@ -162,6 +181,11 @@ public final class Weapon {
     private final boolean automatic;
     private final boolean ejectShell;
     private final FireSound fireSound;
+    private final int magazineCapacity;
+    private final int maxReserveAmmo;
+    private final int reloadFrames;
+    private int ammoInMagazine;
+    private int reserveAmmo;
 
     private Weapon(
             String name,
@@ -176,7 +200,10 @@ public final class Weapon {
             int recoilAmplitude,
             boolean automatic,
             boolean ejectShell,
-            FireSound fireSound) {
+            FireSound fireSound,
+            int magazineCapacity,
+            int maxReserveAmmo,
+            int reloadFrames) {
         this.name = name;
         this.sprite = loadImage(spritePath);
         this.projectileType = projectileType;
@@ -190,6 +217,43 @@ public final class Weapon {
         this.automatic = automatic;
         this.ejectShell = ejectShell;
         this.fireSound = fireSound;
+        this.magazineCapacity = Math.max(1, magazineCapacity);
+        this.maxReserveAmmo = Math.max(0, maxReserveAmmo);
+        this.reloadFrames = Math.max(1, reloadFrames);
+        this.ammoInMagazine = this.magazineCapacity;
+        this.reserveAmmo = this.maxReserveAmmo;
+    }
+
+    private Weapon(Weapon other) {
+        this.name = other.name;
+        this.sprite = other.sprite;
+        this.projectileType = other.projectileType;
+        this.cooldownFrames = other.cooldownFrames;
+        this.projectileSpeed = other.projectileSpeed;
+        this.drawWidth = other.drawWidth;
+        this.drawHeight = other.drawHeight;
+        this.drawOffsetX = other.drawOffsetX;
+        this.drawOffsetY = other.drawOffsetY;
+        this.recoilAmplitude = other.recoilAmplitude;
+        this.automatic = other.automatic;
+        this.ejectShell = other.ejectShell;
+        this.fireSound = other.fireSound;
+        this.magazineCapacity = other.magazineCapacity;
+        this.maxReserveAmmo = other.maxReserveAmmo;
+        this.reloadFrames = other.reloadFrames;
+        this.ammoInMagazine = other.ammoInMagazine;
+        this.reserveAmmo = other.reserveAmmo;
+    }
+
+    public Weapon copy() {
+        return new Weapon(this);
+    }
+
+    public Weapon withAmmo(int ammoInMagazine, int reserveAmmo) {
+        Weapon copy = copy();
+        copy.ammoInMagazine = Math.max(0, Math.min(copy.magazineCapacity, ammoInMagazine));
+        copy.reserveAmmo = Math.max(0, Math.min(copy.maxReserveAmmo, reserveAmmo));
+        return copy;
     }
 
     public String getName() {
@@ -232,6 +296,81 @@ public final class Weapon {
         return "Minigun".equals(name);
     }
 
+    public boolean isAutomatic() {
+        return automatic;
+    }
+
+    public boolean isSameModel(Weapon other) {
+        return other != null && name.equals(other.name);
+    }
+
+    public int getMagazineCapacity() {
+        return magazineCapacity;
+    }
+
+    public int getAmmoInMagazine() {
+        return ammoInMagazine;
+    }
+
+    public int getReserveAmmo() {
+        return reserveAmmo;
+    }
+
+    public int getReloadFrames() {
+        return reloadFrames;
+    }
+
+    public boolean canReload() {
+        return ammoInMagazine < magazineCapacity && reserveAmmo > 0;
+    }
+
+    public boolean reload() {
+        if (!canReload()) {
+            return false;
+        }
+
+        int needed = magazineCapacity - ammoInMagazine;
+        int transferred = Math.min(needed, reserveAmmo);
+        ammoInMagazine += transferred;
+        reserveAmmo -= transferred;
+        return transferred > 0;
+    }
+
+    public int addReserveAmmo(int amount) {
+        if (amount <= 0) {
+            return 0;
+        }
+
+        int previous = reserveAmmo;
+        reserveAmmo = Math.min(maxReserveAmmo, reserveAmmo + amount);
+        return reserveAmmo - previous;
+    }
+
+    public int mergeAmmoFrom(Weapon other) {
+        if (!isSameModel(other)) {
+            return 0;
+        }
+
+        int gained = 0;
+        if (ammoInMagazine < magazineCapacity) {
+            int needed = magazineCapacity - ammoInMagazine;
+            int movedFromMagazine = Math.min(needed, other.ammoInMagazine);
+            ammoInMagazine += movedFromMagazine;
+            gained += movedFromMagazine;
+            needed -= movedFromMagazine;
+
+            if (needed > 0) {
+                int movedFromReserve = Math.min(needed, other.reserveAmmo);
+                ammoInMagazine += movedFromReserve;
+                gained += movedFromReserve;
+            }
+        }
+
+        gained += addReserveAmmo(other.ammoInMagazine);
+        gained += addReserveAmmo(other.reserveAmmo);
+        return gained;
+    }
+
     public double getAiOptimalRange() {
         if (isMinigun()) {
             return 255.0;
@@ -256,58 +395,54 @@ public final class Weapon {
         return getAiOptimalRange() * 1.35;
     }
 
-    public boolean isAutomatic() {
-        return automatic;
+    public boolean fire(Homme shooter, double facingX, double facingY) {
+        return fire(shooter, shooter.x, shooter.y, facingX, facingY);
     }
 
-    public void fire(Homme shooter, double facingX, double facingY) {
-        fire(shooter, shooter.x, shooter.y, facingX, facingY);
-    }
-
-    public void fire(Homme shooter, double originX, double originY, double facingX, double facingY) {
+    public boolean fire(Homme shooter, double originX, double originY, double facingX, double facingY) {
         double len = Math.hypot(facingX, facingY);
         if (len <= 0.0001) {
-            return;
+            return false;
+        }
+
+        if (shooter instanceof Protagonist) {
+            if (ammoInMagazine <= 0) {
+                return false;
+            }
+            ammoInMagazine--;
         }
 
         double dirX = facingX / len;
         double dirY = facingY / len;
         double projectileSpeedValue = getProjectileSpeed();
-        double muzzleOriginX = originX;
-        double muzzleOriginY = originY;
-
         double[] muzzleOrigin = getMuzzleOrigin(originX, originY, dirX, dirY);
-        muzzleOriginX = muzzleOrigin[0];
-        muzzleOriginY = muzzleOrigin[1];
 
         if (GameMode.current == GameMode.ARCADE) {
             triggerArcadeFireFeedback();
         }
 
-        // Pour le shotgun, créer plusieurs pellets en éventail
         if (projectileType == Projectile.ProjectileType.SHOTGUN_PELLET) {
-            int pelletCount = 8; // Nombre de pellets
-            double spreadAngle = Math.PI / 6; // pi/3 = 60 degrés d'angle de dispersion pi/4 = 45 degrés, pi/6 = 30 degrés
+            int pelletCount = 8;
+            double spreadAngle = Math.PI / 6;
             double baseAngle = Math.atan2(dirY, dirX);
-            
+
             for (int i = 0; i < pelletCount; i++) {
                 double angle = baseAngle + (spreadAngle / (pelletCount - 1)) * i - spreadAngle / 2;
                 double spreadX = Math.cos(angle);
                 double spreadY = Math.sin(angle);
-                
+
                 ObjectManager.list.add(new Projectile(
-                        muzzleOriginX,
-                        muzzleOriginY,
+                        muzzleOrigin[0],
+                        muzzleOrigin[1],
                         spreadX * projectileSpeedValue,
                         spreadY * projectileSpeedValue,
                         shooter,
                         projectileType));
             }
         } else {
-            // Comportement normal pour les autres armes
             ObjectManager.list.add(new Projectile(
-                    muzzleOriginX,
-                    muzzleOriginY,
+                    muzzleOrigin[0],
+                    muzzleOrigin[1],
                     dirX * projectileSpeedValue,
                     dirY * projectileSpeedValue,
                     shooter,
@@ -319,6 +454,7 @@ public final class Weapon {
         }
 
         playSound();
+        return true;
     }
 
     public void draw(Graphics2D g2d, double x, double y, int timer, boolean shot) {
@@ -333,7 +469,6 @@ public final class Weapon {
             return;
         }
 
-        // Fallback visuel si l'asset minigun est absent.
         int baseX = (int) x + drawOffsetX;
         int baseY = (int) y + drawOffsetY + offsetArme;
         g2d.setColor(new Color(36, 42, 48));

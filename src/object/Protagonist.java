@@ -29,6 +29,7 @@ public class Protagonist extends Homme{
     private static final double MOVE_SPEED = 2.6;
 
     private int shootCooldown = 0;
+    private int reloadTimer = 0;
     private int timer = 0;
     private final GameKeyController keyController;
     private double facingX;
@@ -51,7 +52,9 @@ public class Protagonist extends Homme{
     public Protagonist(double x, double y, GameKeyController keyController) {
         super(x, y);
         this.keyController = keyController;
-        Weapon[] initial = (GameMode.current == GameMode.STORY || GameMode.current == GameMode.PROTECTION)
+        Weapon[] initial = (GameMode.current == GameMode.STORY
+            || GameMode.current == GameMode.PROTECTION
+            || GameMode.current == GameMode.MISSION)
                 ? Weapon.storyLoadout()
                 : Weapon.protagonistLoadout();
         this.loadout = new ArrayList<>();
@@ -66,15 +69,36 @@ public class Protagonist extends Homme{
 
     /** Ajoute une arme au loadout si elle n'est pas déjà présente. Retourne true si ajoutée. */
     public boolean addWeapon(Weapon weapon) {
-        if (loadout.contains(weapon)) {
-            return false;
+        for (Weapon current : loadout) {
+            if (current.isSameModel(weapon)) {
+                current.mergeAmmoFrom(weapon);
+                return true;
+            }
         }
         loadout.add(weapon);
         return true;
     }
 
     public boolean hasWeapon(Weapon weapon) {
-        return loadout.contains(weapon);
+        for (Weapon current : loadout) {
+            if (current.isSameModel(weapon)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean addAmmoForWeapon(Weapon weapon, int reserveAmmo) {
+        if (weapon == null || reserveAmmo <= 0) {
+            return false;
+        }
+
+        for (Weapon current : loadout) {
+            if (current.isSameModel(weapon)) {
+                return current.addReserveAmmo(reserveAmmo) > 0;
+            }
+        }
+        return false;
     }
 
     public boolean addArmorPlate() {
@@ -95,6 +119,10 @@ public class Protagonist extends Homme{
 
     public int getArmorPlates() {
         return armorPlates;
+    }
+
+    public int getMaxArmorPlates() {
+        return MAX_ARMOR_PLATES;
     }
 
     @Override
@@ -193,12 +221,21 @@ public class Protagonist extends Homme{
         }
 
         int weaponScrollDelta = keyController.consumeWeaponScrollDelta();
-        if (weaponScrollDelta != 0 && loadout.size() > 0) {
+        if (weaponScrollDelta != 0 && loadout.size() > 0 && reloadTimer == 0) {
             selectedWeaponIndex = Math.floorMod(selectedWeaponIndex + weaponScrollDelta, loadout.size());
         }
 
         if (shootCooldown > 0) {
                 shootCooldown--;
+        }
+        if (reloadTimer > 0) {
+            reloadTimer--;
+            if (reloadTimer == 0) {
+                Weapon weapon = getCurrentWeapon();
+                if (weapon != null) {
+                    weapon.reload();
+                }
+            }
         }
 
         double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
@@ -213,15 +250,22 @@ public class Protagonist extends Homme{
         if (keyController.isRight()) inputX += 1;
         if (keyController.isUp()) inputY -= 1;
         if (keyController.isDown()) inputY += 1;
-        Weapon currentWeapon = loadout.size() > 0 ? loadout.get(Math.min(selectedWeaponIndex, loadout.size() - 1)) : null;
+        Weapon currentWeapon = getCurrentWeapon();
+        if (keyController.consumeReloadTriggered() && currentWeapon != null && reloadTimer == 0 && currentWeapon.canReload()) {
+            reloadTimer = currentWeapon.getReloadFrames();
+        }
         boolean leftClickTriggered = keyController.consumeLeftClickPressed();
         boolean shouldFire = currentWeapon != null
                 && shootCooldown == 0
+                && reloadTimer == 0
                 && (currentWeapon.isAutomatic() ? keyController.isLeftClickPressed() : leftClickTriggered);
         if (shouldFire) {
-            currentWeapon.fire(this, facingX, facingY);
-            shootCooldown = currentWeapon.getCooldownFrames();
-            shot = true;
+            if (currentWeapon.fire(this, facingX, facingY)) {
+                shootCooldown = currentWeapon.getCooldownFrames();
+                shot = true;
+            } else if (currentWeapon.canReload()) {
+                reloadTimer = currentWeapon.getReloadFrames();
+            }
         }
 
         if (inputX != 0 || inputY != 0) {
@@ -255,7 +299,7 @@ public class Protagonist extends Homme{
         
         double drawVx = facingX;
         double drawVy = facingY;
-        Weapon currentWeapon = loadout.size() > 0 ? loadout.get(Math.min(selectedWeaponIndex, loadout.size() - 1)) : null;
+        Weapon currentWeapon = getCurrentWeapon();
 
         double angle = Math.atan2(drawVy, drawVx) + Math.PI / 2;
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
@@ -293,6 +337,31 @@ public class Protagonist extends Homme{
 
     public double getFacingY() {
         return facingY;
+    }
+
+    public Weapon getCurrentWeapon() {
+        if (loadout.isEmpty()) {
+            return null;
+        }
+        return loadout.get(Math.min(selectedWeaponIndex, loadout.size() - 1));
+    }
+
+    public boolean isReloading() {
+        return reloadTimer > 0;
+    }
+
+    public int getReloadTimer() {
+        return reloadTimer;
+    }
+
+    public double getReloadProgress() {
+        Weapon currentWeapon = getCurrentWeapon();
+        if (currentWeapon == null || reloadTimer <= 0) {
+            return 0.0;
+        }
+
+        int reloadFrames = Math.max(1, currentWeapon.getReloadFrames());
+        return 1.0 - Math.max(0.0, Math.min(1.0, reloadTimer / (double) reloadFrames));
     }
 
 }

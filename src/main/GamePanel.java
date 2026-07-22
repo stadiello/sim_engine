@@ -4,17 +4,23 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.KeyboardFocusManager;
 import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 
 import gameController.GameKeyController;
 import object.GameObject;
 import object.ai.AiTuning;
+import object.ai.TacticalMovement;
 import object.Alien;
 import object.AlienTeleport;
 import object.Ennemi;
 import object.Ennemi.EnemyArchetype;
 import object.Homme;
+import object.Hostage;
+import object.ImpactSpark;
 import object.Protagonist;
+import object.Shockwave;
 import object.Soldat;
 import object.ObjectManager;
 import world.TileManager;
@@ -27,6 +33,20 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int ARCADE_BASE_WAVE_INTERVAL_FRAMES = TARGET_UPS * 14;
     private static final int ARCADE_MIN_WAVE_INTERVAL_FRAMES = TARGET_UPS * 7;
     private static final int ARCADE_WAVE_BANNER_FRAMES = TARGET_UPS * 2;
+    private static final int MISSION_DETONATION_FUSE_FRAMES = TARGET_UPS * 3;
+    private static final int MISSION_DEFEND_HOLD_FRAMES = TARGET_UPS * 35;
+    private static final int MISSION_SECURE_HOLD_FRAMES = TARGET_UPS * 8;
+    private static final double MISSION_INTERACT_DISTANCE = 84.0;
+    private static final double MISSION_HOSTAGE_FREE_DISTANCE = 90.0;
+    private static final double MISSION_INFILTRATION_DETECT_DISTANCE = 260.0;
+
+    private enum MissionType {
+        RESCUE_HOSTAGES,
+        DEFEND_POSITION,
+        SECURE_ZONE,
+        INFILTRATE,
+        DESTROY_VEHICLE
+    }
 
     private enum ScreenState {
         MENU,
@@ -58,6 +78,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final double ENEMY_FLASHLIGHT_HALF_ANGLE = Math.toRadians(25);
     private static final double EXTRACTION_MARGIN_TILES = 1.5;
     private static final double FLASHLIGHT_RAY_STEP = 8.0;
+    private static final int HUD_PANEL_ARC = 22;
     private static GamePanel activePanel;
 
     TileManager tileManager = new TileManager(this);
@@ -74,6 +95,21 @@ public class GamePanel extends JPanel implements Runnable {
     private Color screenFlashColor = new Color(255, 236, 160);
     private float screenFlashAlpha = 0f;
     private int alienRespawnCooldownFrames = 0;
+    private int missionRotationIndex = 0;
+    private MissionType activeMissionType;
+    private String activeMissionTitle = "";
+    private Rectangle2D.Double missionPrimaryZone;
+    private Rectangle2D.Double missionSecondaryZone;
+    private final ArrayList<Hostage> missionHostages = new ArrayList<>();
+    private final ArrayList<Hostage> missionFreedHostages = new ArrayList<>();
+    private final ArrayList<Hostage> missionExtractedHostages = new ArrayList<>();
+    private int missionDefendFramesRemaining = 0;
+    private int missionSecureFrames = 0;
+    private double missionVehicleX = -1;
+    private double missionVehicleY = -1;
+    private boolean missionVehicleChargeArmed = false;
+    private int missionVehicleFuseFrames = 0;
+    private boolean missionFailed = false;
 
     public static int score = 0;
 
@@ -93,6 +129,7 @@ public class GamePanel extends JPanel implements Runnable {
         score = 0;
         gameOverTitle = "VOUS ETES MORT";
         resetArcadeState();
+        resetMissionState();
 
         int civilsToSpawn = nombreCivil;
         int soldatsToSpawn = nombreSoldat;
@@ -100,6 +137,9 @@ public class GamePanel extends JPanel implements Runnable {
             civilsToSpawn = Math.max(4, nombreCivil);
             soldatsToSpawn = Math.max(1, nombreSoldat);
         } else if (GameMode.current == GameMode.ARCADE) {
+            civilsToSpawn = Math.max(1, Math.min(2, nombreCivil));
+            soldatsToSpawn = Math.max(1, nombreSoldat);
+        } else if (GameMode.current == GameMode.MISSION) {
             civilsToSpawn = Math.max(1, Math.min(2, nombreCivil));
             soldatsToSpawn = Math.max(1, nombreSoldat);
         }
@@ -150,6 +190,10 @@ public class GamePanel extends JPanel implements Runnable {
             );
             ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], chooseEnemyArchetype(i, enemyCount)));
         }
+
+        if (GameMode.current == GameMode.MISSION) {
+            setupMission(protagonistSpawnX, protagonistSpawnY);
+        }
     }
 
     private void resetArcadeState() {
@@ -162,6 +206,23 @@ public class GamePanel extends JPanel implements Runnable {
         screenFlashAlpha = 0f;
         screenFlashColor = new Color(255, 236, 160);
         alienRespawnCooldownFrames = 0;
+    }
+
+    private void resetMissionState() {
+        activeMissionType = null;
+        activeMissionTitle = "";
+        missionPrimaryZone = null;
+        missionSecondaryZone = null;
+        missionHostages.clear();
+        missionFreedHostages.clear();
+        missionExtractedHostages.clear();
+        missionDefendFramesRemaining = 0;
+        missionSecureFrames = 0;
+        missionVehicleX = -1;
+        missionVehicleY = -1;
+        missionVehicleChargeArmed = false;
+        missionVehicleFuseFrames = 0;
+        missionFailed = false;
     }
 
     private EnemyArchetype chooseEnemyArchetype(int index, int total) {
@@ -202,6 +263,305 @@ public class GamePanel extends JPanel implements Runnable {
             {centerStart, centerEnd, bottomStart, bottomEnd},
             {Math.max(1, centerStart - 12), Math.max(1, centerEnd - 12), bottomStart, bottomEnd}
         };
+    }
+
+    private MissionType selectNextMissionType() {
+        MissionType[] types = MissionType.values();
+        MissionType type = types[missionRotationIndex % types.length];
+        missionRotationIndex++;
+        return type;
+    }
+
+    private Rectangle2D.Double zoneFromTiles(int startCol, int endCol, int startRow, int endRow) {
+        int minCol = Math.max(0, Math.min(startCol, tileManager.getMapCols() - 1));
+        int maxCol = Math.max(0, Math.min(endCol, tileManager.getMapCols() - 1));
+        int minRow = Math.max(0, Math.min(startRow, tileManager.getMapRows() - 1));
+        int maxRow = Math.max(0, Math.min(endRow, tileManager.getMapRows() - 1));
+
+        if (minCol > maxCol || minRow > maxRow) {
+            return new Rectangle2D.Double(0, 0, tileSize * 2.0, tileSize * 2.0);
+        }
+
+        double x = minCol * tileSize;
+        double y = minRow * tileSize;
+        double width = (maxCol - minCol + 1) * tileSize;
+        double height = (maxRow - minRow + 1) * tileSize;
+        return new Rectangle2D.Double(x, y, width, height);
+    }
+
+    private void setupMission(double protagonistSpawnX, double protagonistSpawnY) {
+        activeMissionType = selectNextMissionType();
+
+        int cols = tileManager.getMapCols();
+        int rows = tileManager.getMapRows();
+        int centerRow = Math.max(3, rows / 2 - 2);
+
+        switch (activeMissionType) {
+            case RESCUE_HOSTAGES -> {
+                activeMissionTitle = "Mission: Liberer les otages";
+                int startCol = Math.max(2, cols - 13);
+                int endCol = Math.max(4, cols - 8);
+                int startRow = 4;
+                int endRow = Math.min(rows - 6, 11);
+                missionPrimaryZone = zoneFromTiles(startCol, endCol, startRow, endRow);
+                missionSecondaryZone = zoneFromTiles(3, Math.min(8, cols - 2), 3, Math.min(8, rows - 2));
+
+                for (int i = 0; i < 3; i++) {
+                    double[] spawn = getFreeSpawnPositionInZone(startCol, endCol, startRow + 1, Math.max(startRow + 1, endRow - 1));
+                    Hostage hostage = new Hostage(spawn[0], spawn[1]);
+                    missionHostages.add(hostage);
+                    ObjectManager.list.add(hostage);
+                }
+
+                spawnMissionGuards(startCol, endCol, startRow, endRow);
+            }
+            case DEFEND_POSITION -> {
+                activeMissionTitle = "Mission: Proteger la position";
+                missionPrimaryZone = new Rectangle2D.Double(
+                        protagonistSpawnX - tileSize * 2.5,
+                        protagonistSpawnY - tileSize * 2.5,
+                        tileSize * 5.0,
+                        tileSize * 5.0
+                );
+                missionDefendFramesRemaining = MISSION_DEFEND_HOLD_FRAMES;
+            }
+            case SECURE_ZONE -> {
+                activeMissionTitle = "Mission: Securiser la zone";
+                missionPrimaryZone = zoneFromTiles(Math.max(8, cols / 2 - 4), Math.min(cols - 4, cols / 2 + 4), centerRow, Math.min(rows - 4, centerRow + 7));
+                missionSecureFrames = 0;
+            }
+            case INFILTRATE -> {
+                activeMissionTitle = "Mission: Infiltration";
+                missionPrimaryZone = zoneFromTiles(Math.max(3, cols - 8), Math.max(5, cols - 4), 3, Math.min(rows - 4, 8));
+            }
+            case DESTROY_VEHICLE -> {
+                activeMissionTitle = "Mission: Sabotage";
+                int col = Math.max(6, cols - 9);
+                int row = Math.max(6, rows - 8);
+                missionVehicleX = col * tileSize + tileSize * 0.5;
+                missionVehicleY = row * tileSize + tileSize * 0.5;
+                missionPrimaryZone = new Rectangle2D.Double(
+                        missionVehicleX - tileSize * 1.5,
+                        missionVehicleY - tileSize,
+                        tileSize * 3.0,
+                        tileSize * 2.0
+                );
+            }
+        }
+    }
+
+    private void updateMissionMode(Protagonist protagonist) {
+        if (GameMode.current != GameMode.MISSION || activeMissionType == null || protagonist == null || missionFailed) {
+            return;
+        }
+
+        boolean interactTriggered = keyController.consumeInteractTriggered();
+
+        switch (activeMissionType) {
+            case RESCUE_HOSTAGES -> updateRescueMission(protagonist, interactTriggered);
+            case DEFEND_POSITION -> updateDefendMission(protagonist);
+            case SECURE_ZONE -> updateSecureMission(protagonist);
+            case INFILTRATE -> updateInfiltrationMission(protagonist);
+            case DESTROY_VEHICLE -> updateSabotageMission(protagonist, interactTriggered);
+        }
+    }
+
+    private void updateRescueMission(Protagonist protagonist, boolean interactTriggered) {
+        int aliveHostages = 0;
+        int deadHostages = 0;
+
+        for (Hostage hostage : missionHostages) {
+            if (missionExtractedHostages.contains(hostage)) {
+                continue;
+            }
+
+            if (!isObjectAlive(hostage)) {
+                deadHostages++;
+                continue;
+            }
+
+            aliveHostages++;
+            if (!hostage.isRescued()) {
+                double dx = hostage.x - protagonist.x;
+                double dy = hostage.y - protagonist.y;
+                if (interactTriggered && dx * dx + dy * dy <= MISSION_HOSTAGE_FREE_DISTANCE * MISSION_HOSTAGE_FREE_DISTANCE) {
+                    hostage.rescue();
+                    if (!missionFreedHostages.contains(hostage)) {
+                        missionFreedHostages.add(hostage);
+                    }
+                }
+            }
+
+            if (hostage.isRescued() && missionSecondaryZone != null && missionSecondaryZone.contains(hostage.x, hostage.y)) {
+                missionExtractedHostages.add(hostage);
+                ObjectManager.list.remove(hostage);
+            }
+        }
+
+        if (deadHostages > 0) {
+            failMission("OTAGE ABATTU");
+            return;
+        }
+
+        if (!missionHostages.isEmpty() && missionExtractedHostages.size() >= missionHostages.size()) {
+            screenState = ScreenState.VICTORY;
+            paused = false;
+            return;
+        }
+
+        if (aliveHostages <= 0 && missionExtractedHostages.isEmpty()) {
+            failMission("OTAGES PERDUS");
+        }
+    }
+
+    private void spawnMissionGuards(int startCol, int endCol, int startRow, int endRow) {
+        int outerStartCol = Math.max(1, startCol - 2);
+        int outerEndCol = Math.min(tileManager.getMapCols() - 2, endCol + 2);
+        int outerStartRow = Math.max(1, startRow - 1);
+        int outerEndRow = Math.min(tileManager.getMapRows() - 2, endRow + 2);
+
+        EnemyArchetype[] guards = {
+                EnemyArchetype.STANDARD,
+                EnemyArchetype.STANDARD,
+                EnemyArchetype.ASSAUT,
+                EnemyArchetype.FLANQUEUR
+        };
+
+        for (int i = 0; i < guards.length; i++) {
+            double[] spawn = getFreeSpawnPositionInZone(outerStartCol, outerEndCol, outerStartRow, outerEndRow);
+            ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], guards[i]));
+        }
+    }
+
+    private void updateDefendMission(Protagonist protagonist) {
+        if (missionPrimaryZone != null && missionPrimaryZone.contains(protagonist.x, protagonist.y)) {
+            missionDefendFramesRemaining = Math.max(0, missionDefendFramesRemaining - 1);
+        }
+
+        if (missionDefendFramesRemaining <= 0) {
+            screenState = ScreenState.VICTORY;
+            paused = false;
+        }
+    }
+
+    private void updateSecureMission(Protagonist protagonist) {
+        int hostilesInZone = countHostilesInZone(missionPrimaryZone);
+        boolean protagonistInZone = missionPrimaryZone != null && missionPrimaryZone.contains(protagonist.x, protagonist.y);
+
+        if (hostilesInZone == 0 && protagonistInZone) {
+            missionSecureFrames++;
+        } else {
+            missionSecureFrames = Math.max(0, missionSecureFrames - 2);
+        }
+
+        if (missionSecureFrames >= MISSION_SECURE_HOLD_FRAMES) {
+            screenState = ScreenState.VICTORY;
+            paused = false;
+        }
+    }
+
+    private void updateInfiltrationMission(Protagonist protagonist) {
+        if (isProtagonistDetected(protagonist)) {
+            failMission("INFILTRATION COMPROMISE");
+            return;
+        }
+
+        if (missionPrimaryZone != null && missionPrimaryZone.contains(protagonist.x, protagonist.y)) {
+            screenState = ScreenState.VICTORY;
+            paused = false;
+        }
+    }
+
+    private void updateSabotageMission(Protagonist protagonist, boolean interactTriggered) {
+        double dx = missionVehicleX - protagonist.x;
+        double dy = missionVehicleY - protagonist.y;
+        boolean closeEnough = dx * dx + dy * dy <= MISSION_INTERACT_DISTANCE * MISSION_INTERACT_DISTANCE;
+
+        if (!missionVehicleChargeArmed && closeEnough && interactTriggered) {
+            missionVehicleChargeArmed = true;
+            missionVehicleFuseFrames = MISSION_DETONATION_FUSE_FRAMES;
+            GamePanel.triggerScreenFlash(new Color(255, 230, 140), 0.09f, 4);
+        }
+
+        if (missionVehicleChargeArmed) {
+            missionVehicleFuseFrames = Math.max(0, missionVehicleFuseFrames - 1);
+            if (missionVehicleFuseFrames <= 0) {
+                for (int i = 0; i < 6; i++) {
+                    ObjectManager.list.add(new ImpactSpark(
+                            missionVehicleX,
+                            missionVehicleY,
+                            Math.random() * 2.0 - 1.0,
+                            Math.random() * 2.0 - 1.0,
+                            1.8,
+                            new Color(255, 214, 138),
+                            new Color(255, 118, 72)
+                    ));
+                }
+
+                ObjectManager.list.add(new Shockwave(missionVehicleX, missionVehicleY, protagonist, tileSize * 3.2));
+                triggerScreenShake(16, 7.8);
+                triggerScreenFlash(new Color(255, 170, 96), 0.24f, 8);
+                screenState = ScreenState.VICTORY;
+                paused = false;
+            }
+        }
+    }
+
+    private void failMission(String reason) {
+        missionFailed = true;
+        gameOverTitle = reason;
+        screenState = ScreenState.GAME_OVER;
+        paused = false;
+    }
+
+    private boolean isObjectAlive(GameObject target) {
+        if (target == null) {
+            return false;
+        }
+
+        for (GameObject obj : ObjectManager.list) {
+            if (obj == target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int countHostilesInZone(Rectangle2D zone) {
+        if (zone == null) {
+            return 0;
+        }
+
+        int count = 0;
+        for (GameObject obj : ObjectManager.list) {
+            if (obj instanceof Ennemi || obj instanceof Alien) {
+                if (zone.contains(obj.x, obj.y)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private boolean isProtagonistDetected(Protagonist protagonist) {
+        for (GameObject obj : ObjectManager.list) {
+            if (!(obj instanceof Ennemi) && !(obj instanceof Alien)) {
+                continue;
+            }
+
+            double dx = protagonist.x - obj.x;
+            double dy = protagonist.y - obj.y;
+            double distSq = dx * dx + dy * dy;
+            if (distSq > MISSION_INFILTRATION_DETECT_DISTANCE * MISSION_INFILTRATION_DETECT_DISTANCE) {
+                continue;
+            }
+
+            if (TacticalMovement.hasLineOfSight(obj.x, obj.y, protagonist.x, protagonist.y)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private double[] getFreeSpawnPositionInZone(int startCol, int endCol, int startRow, int endRow) {
@@ -433,6 +793,13 @@ public class GamePanel extends JPanel implements Runnable {
                 return;
             }
 
+            if (GameMode.current == GameMode.MISSION) {
+                updateMissionMode(protagonist);
+                if (screenState != ScreenState.PLAYING) {
+                    return;
+                }
+            }
+
             if (GameMode.current == GameMode.PROTECTION) {
                 int[] counts = ObjectManager.getUiCounts();
                 int alliesAlive = counts[0] + counts[1];
@@ -611,6 +978,11 @@ public class GamePanel extends JPanel implements Runnable {
                 initializeWorld();
                 screenState = ScreenState.PLAYING;
                 paused = false;
+            } else if (getMissionModeButtonBounds().contains(mouseX, mouseY)) {
+                GameMode.current = GameMode.MISSION;
+                initializeWorld();
+                screenState = ScreenState.PLAYING;
+                paused = false;
             } else if (getProtectionModeButtonBounds().contains(mouseX, mouseY)) {
                 GameMode.current = GameMode.PROTECTION;
                 initializeWorld();
@@ -666,14 +1038,19 @@ public class GamePanel extends JPanel implements Runnable {
         return new Rectangle(free.x, free.y + 62, free.width, free.height);
     }
 
+    private Rectangle getMissionModeButtonBounds() {
+        Rectangle story = getStoryModeButtonBounds();
+        return new Rectangle(story.x, story.y + 62, story.width, story.height);
+    }
+
     private Rectangle getArcadeModeButtonBounds() {
         Rectangle free = getFreeModeButtonBounds();
         return new Rectangle(free.x, free.y + 62, free.width, free.height);
     }
 
     private Rectangle getProtectionModeButtonBounds() {
-        Rectangle story = getStoryModeButtonBounds();
-        return new Rectangle(story.x, story.y + 62, story.width, story.height);
+        Rectangle mission = getMissionModeButtonBounds();
+        return new Rectangle(mission.x, mission.y + 62, mission.width, mission.height);
     }
 
     private Rectangle getOptionsButtonBounds() {
@@ -836,6 +1213,78 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawString("EXTRACTION", zoneX + 8, 22);
     }
 
+    private void drawMissionWorldMarkers(Graphics2D g2d) {
+        if (GameMode.current != GameMode.MISSION || screenState != ScreenState.PLAYING || activeMissionType == null) {
+            return;
+        }
+
+        if (missionPrimaryZone != null) {
+            g2d.setColor(new Color(110, 210, 255, 52));
+            g2d.fill(missionPrimaryZone);
+            g2d.setColor(new Color(140, 228, 255, 180));
+            g2d.setStroke(new BasicStroke(2f));
+            g2d.draw(missionPrimaryZone);
+
+            if (activeMissionType == MissionType.RESCUE_HOSTAGES) {
+                g2d.drawString("CAPTIFS", (int) Math.round(missionPrimaryZone.x + 10), (int) Math.round(missionPrimaryZone.y + 20));
+            }
+        }
+
+        if (missionSecondaryZone != null) {
+            g2d.setColor(new Color(240, 202, 122, 44));
+            g2d.fill(missionSecondaryZone);
+            g2d.setColor(new Color(255, 224, 146, 165));
+            g2d.setStroke(new BasicStroke(2f));
+            g2d.draw(missionSecondaryZone);
+
+            if (activeMissionType == MissionType.RESCUE_HOSTAGES) {
+                g2d.drawString("EXFIL", (int) Math.round(missionSecondaryZone.x + 10), (int) Math.round(missionSecondaryZone.y + 20));
+            }
+        }
+
+        if (activeMissionType == MissionType.RESCUE_HOSTAGES) {
+            for (Hostage hostage : missionHostages) {
+                if (missionExtractedHostages.contains(hostage)) {
+                    continue;
+                }
+                if (!isObjectAlive(hostage)) {
+                    continue;
+                }
+
+                boolean freed = hostage.isRescued();
+                int radius = 16;
+                g2d.setColor(freed ? new Color(120, 255, 170, 170) : new Color(255, 190, 110, 165));
+                g2d.fillOval((int) Math.round(hostage.x - radius), (int) Math.round(hostage.y - radius), radius * 2, radius * 2);
+                g2d.setColor(freed ? new Color(170, 255, 200) : new Color(255, 218, 155));
+                g2d.drawOval((int) Math.round(hostage.x - radius), (int) Math.round(hostage.y - radius), radius * 2, radius * 2);
+            }
+        }
+
+        if (activeMissionType == MissionType.DESTROY_VEHICLE && missionVehicleX >= 0 && missionVehicleY >= 0) {
+            int bodyW = (int) Math.round(tileSize * 1.3);
+            int bodyH = (int) Math.round(tileSize * 0.76);
+            int x = (int) Math.round(missionVehicleX - bodyW / 2.0);
+            int y = (int) Math.round(missionVehicleY - bodyH / 2.0);
+
+            g2d.setColor(new Color(82, 96, 108));
+            g2d.fillRoundRect(x, y, bodyW, bodyH, 10, 10);
+            g2d.setColor(new Color(125, 142, 156));
+            g2d.drawRoundRect(x, y, bodyW, bodyH, 10, 10);
+            g2d.setColor(new Color(34, 39, 46));
+            g2d.fillRect(x + 7, y + bodyH - 5, 18, 5);
+            g2d.fillRect(x + bodyW - 25, y + bodyH - 5, 18, 5);
+
+            if (missionVehicleChargeArmed) {
+                float pulse = (float) (0.55 + 0.45 * Math.abs(Math.sin(missionVehicleFuseFrames * 0.23)));
+                Composite oldComposite = g2d.getComposite();
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, pulse));
+                g2d.setColor(new Color(255, 110, 86));
+                g2d.fillOval((int) Math.round(missionVehicleX - 10), (int) Math.round(missionVehicleY - 10), 20, 20);
+                g2d.setComposite(oldComposite);
+            }
+        }
+    }
+
     private boolean isNightMap() {
         return tileManager.getCurrentMapType() == MapType.NIGHT_BLACKOUT;
     }
@@ -960,46 +1409,226 @@ public class GamePanel extends JPanel implements Runnable {
         );
     }
 
-    private void drawUI(Graphics g) {
-        // Affiche le compteur des entites encore en vie.
-        int[] counts = ObjectManager.getUiCounts();
-        int civils = counts[0];
-        int soldats = counts[1];
-        int aliens = counts[2];
-        int initialAllies = Math.max(1, nombreCivil + nombreSoldat);
+    private void drawPanelBackground(Graphics2D g2d, int x, int y, int width, int height, Color fill, Color border) {
+        g2d.setColor(fill);
+        g2d.fillRoundRect(x, y, width, height, HUD_PANEL_ARC, HUD_PANEL_ARC);
+        g2d.setColor(border);
+        g2d.setStroke(new BasicStroke(1.8f));
+        g2d.drawRoundRect(x, y, width, height, HUD_PANEL_ARC, HUD_PANEL_ARC);
+    }
 
-        g.setColor(Color.WHITE);
-        g.drawString("Civils: " + civils, 10, 20);
-        g.drawString("Soldats: " + soldats, 10, 40);
-        g.drawString("Aliens: " + aliens, 10, 60);
-        g.drawString("Casualties: " + Math.max(0, initialAllies - civils - soldats), 10, 80);
-        g.drawString("P: Pause", 10, 100);
-        g.drawString("Shift: Sprint", 10, 120);
+    private void drawTopStatusBar(Graphics2D g2d) {
+        int x = 16;
+        int y = 14;
+        int width = 330;
+        int height = GameMode.current == GameMode.MISSION ? 118 : 86;
 
-        Protagonist protagonist = ObjectManager.getProtagonist();
-        if (protagonist != null) {
-            g.setColor(new Color(145, 220, 255));
-            g.drawString("Plaques: " + protagonist.getArmorPlates(), 10, 140);
-            g.setColor(Color.WHITE);
+        drawPanelBackground(g2d, x, y, width, height, new Color(8, 14, 24, 190), new Color(108, 160, 220, 170));
+
+        Font oldFont = g2d.getFont();
+        g2d.setColor(new Color(136, 195, 255));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 14f));
+        g2d.drawString(getModeDisplayLabel(), x + 16, y + 24);
+
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 20f));
+        g2d.drawString(getTopHudTitle(), x + 16, y + 50);
+
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 14f));
+        g2d.setColor(new Color(214, 228, 244));
+        int infoY = y + 72;
+        for (String line : getTopHudDetails()) {
+            g2d.drawString(line, x + 16, infoY);
+            infoY += 18;
         }
 
-        if (GameMode.current == GameMode.ARCADE) {
-            g.setColor(new Color(255, 215, 110));
-            g.drawString("Arcade: vague " + (arcadeWaveIndex + 1), 10, 165);
-            g.drawString("Renforts dans: " + Math.max(0, arcadeWaveTimer / TARGET_UPS) + "s", 10, 185);
-            g.setColor(Color.WHITE);
-        }
+        g2d.setFont(oldFont);
+    }
 
+    private String getModeDisplayLabel() {
+        return switch (GameMode.current) {
+            case FREE -> "MODE LIBRE";
+            case ARCADE -> "MODE ARCADE";
+            case STORY -> "MODE HISTOIRE";
+            case PROTECTION -> "MODE PROTECTION";
+            case MISSION -> "MODE MISSION";
+        };
+    }
+
+    private String getTopHudTitle() {
+        if (GameMode.current == GameMode.MISSION && activeMissionTitle != null && !activeMissionTitle.isEmpty()) {
+            return activeMissionTitle;
+        }
         if (GameMode.current == GameMode.PROTECTION) {
-            if (protagonist != null) {
-                double distanceToExtraction = Math.max(0, getExtractionX() - protagonist.x);
-                g.setColor(new Color(255, 231, 133));
-                int baseY = GameMode.current == GameMode.ARCADE ? 210 : 165;
-                g.drawString("Protection: escorte jusqu'a la zone d'extraction", 10, baseY);
-                g.drawString("Distance extraction: " + (int) Math.round(distanceToExtraction) + " px", 10, baseY + 20);
-                g.drawString("Allies a proteger: " + (civils + soldats), 10, baseY + 40);
-            }
+            return "Escorter jusqu'a extraction";
         }
+        if (GameMode.current == GameMode.ARCADE) {
+            return "Pression continue";
+        }
+        if (GameMode.current == GameMode.STORY) {
+            return "Recuperation d'armement";
+        }
+        return "Survie tactique";
+    }
+
+    private String[] getTopHudDetails() {
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (GameMode.current == GameMode.MISSION) {
+            return getMissionTopHudDetails();
+        }
+        if (GameMode.current == GameMode.PROTECTION && protagonist != null) {
+            int[] counts = ObjectManager.getUiCounts();
+            double distanceToExtraction = Math.max(0, getExtractionX() - protagonist.x);
+            return new String[]{
+                    "Distance extraction : " + (int) Math.round(distanceToExtraction) + " px",
+                    "Allies encore en vie : " + (counts[0] + counts[1]),
+                    "Maintiens la colonne en mouvement"
+            };
+        }
+        if (GameMode.current == GameMode.ARCADE) {
+            return new String[]{
+                    "Vague : " + (arcadeWaveIndex + 1),
+                    "Renforts dans : " + Math.max(0, arcadeWaveTimer / TARGET_UPS) + " s"
+            };
+        }
+        if (GameMode.current == GameMode.STORY) {
+            return new String[]{
+                    "Ramasse les armes ennemies",
+                    "Conserve tes chargeurs pour progresser"
+            };
+        }
+        return new String[]{
+                "Sprint : Shift",
+                "Pause : P"
+        };
+    }
+
+    private String[] getMissionTopHudDetails() {
+        if (activeMissionType == null) {
+            return new String[]{"Objectif en attente"};
+        }
+
+        return switch (activeMissionType) {
+            case RESCUE_HOSTAGES -> new String[]{
+                    "Gardes en zone : " + countHostilesInZone(missionPrimaryZone),
+                    "Otages extraits : " + missionExtractedHostages.size() + "/" + missionHostages.size(),
+                    missionFreedHostages.size() < missionHostages.size() ? "Approche et appuie sur E pour delivrer" : "Replie-les vers l'exfiltration"
+            };
+            case DEFEND_POSITION -> new String[]{
+                    "Temps a tenir : " + Math.max(0, missionDefendFramesRemaining / TARGET_UPS) + " s",
+                    "Reste dans le perimetre"
+            };
+            case SECURE_ZONE -> new String[]{
+                    "Hostiles dans la zone : " + countHostilesInZone(missionPrimaryZone),
+                    "Stabilisation : " + Math.min(100, (missionSecureFrames * 100) / MISSION_SECURE_HOLD_FRAMES) + " %"
+            };
+            case INFILTRATE -> new String[]{
+                    "Aucun contact visuel autorise",
+                    "Reste hors des lignes de vue"
+            };
+            case DESTROY_VEHICLE -> new String[]{
+                    missionVehicleChargeArmed
+                            ? "Charge activee : " + Math.max(0, missionVehicleFuseFrames / TARGET_UPS) + " s"
+                            : "Approche le vehicule et appuie sur E",
+                    missionVehicleChargeArmed ? "Decroche avant l'explosion" : "Prepare l'exfiltration"
+            };
+        };
+    }
+
+    private void drawBottomRightHud(Graphics2D g2d) {
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist == null) {
+            return;
+        }
+
+        int panelWidth = 250;
+        int panelHeight = protagonist.isReloading() ? 154 : 136;
+        int x = getWidth() - panelWidth - 18;
+        int y = getHeight() - panelHeight - 18;
+        drawPanelBackground(g2d, x, y, panelWidth, panelHeight, new Color(10, 12, 20, 205), new Color(255, 208, 120, 165));
+
+        Font oldFont = g2d.getFont();
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 13f));
+        g2d.setColor(new Color(143, 188, 255));
+        g2d.drawString("OPERATEUR", x + 16, y + 22);
+
+        if (protagonist.getCurrentWeapon() != null) {
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(oldFont.deriveFont(Font.BOLD, 20f));
+            g2d.drawString(protagonist.getCurrentWeapon().getName(), x + 16, y + 50);
+
+            g2d.setColor(new Color(255, 222, 140));
+            g2d.setFont(oldFont.deriveFont(Font.BOLD, 30f));
+            String ammo = protagonist.getCurrentWeapon().getAmmoInMagazine() + " / " + protagonist.getCurrentWeapon().getReserveAmmo();
+            g2d.drawString(ammo, x + 16, y + 84);
+
+            g2d.setFont(oldFont.deriveFont(Font.PLAIN, 12f));
+            g2d.setColor(new Color(188, 200, 218));
+            g2d.drawString("CHARGEUR / RESERVE", x + 18, y + 100);
+        }
+
+        int plateBaseX = x + 16;
+        int plateY = y + panelHeight - 34;
+        for (int i = 0; i < protagonist.getMaxArmorPlates(); i++) {
+            int plateX = plateBaseX + i * 24;
+            Color fill = i < protagonist.getArmorPlates() ? new Color(108, 214, 255) : new Color(36, 50, 68);
+            Color border = i < protagonist.getArmorPlates() ? new Color(184, 243, 255) : new Color(88, 102, 120);
+            g2d.setColor(fill);
+            g2d.fillRoundRect(plateX, plateY, 18, 18, 5, 5);
+            g2d.setColor(border);
+            g2d.drawRoundRect(plateX, plateY, 18, 18, 5, 5);
+        }
+        g2d.setColor(new Color(206, 220, 236));
+        g2d.setFont(oldFont.deriveFont(Font.PLAIN, 12f));
+        g2d.drawString("PLAQUES", plateBaseX + protagonist.getMaxArmorPlates() * 24 + 4, plateY + 14);
+
+        if (protagonist.isReloading()) {
+            int barX = x + 16;
+            int barY = y + panelHeight - 60;
+            int barWidth = panelWidth - 32;
+            int barHeight = 10;
+            double progress = protagonist.getReloadProgress();
+            g2d.setColor(new Color(32, 40, 52));
+            g2d.fillRoundRect(barX, barY, barWidth, barHeight, 8, 8);
+            g2d.setColor(new Color(255, 176, 92));
+            g2d.fillRoundRect(barX, barY, (int) Math.round(barWidth * progress), barHeight, 8, 8);
+            g2d.setColor(new Color(255, 226, 188));
+            g2d.drawRoundRect(barX, barY, barWidth, barHeight, 8, 8);
+            g2d.drawString("RECHARGEMENT", barX, barY - 4);
+        }
+
+        g2d.setFont(oldFont);
+    }
+
+    private void drawReloadAnimation(Graphics2D g2d) {
+        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (protagonist == null || !protagonist.isReloading()) {
+            return;
+        }
+
+        int cameraX = tileManager.getCameraX();
+        int cameraY = tileManager.getCameraY();
+        int screenX = (int) Math.round(protagonist.x - cameraX);
+        int screenY = (int) Math.round(protagonist.y - cameraY - 34);
+        int radius = 18;
+        double progress = protagonist.getReloadProgress();
+
+        Composite oldComposite = g2d.getComposite();
+        Stroke oldStroke = g2d.getStroke();
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.92f));
+        g2d.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(34, 40, 50, 190));
+        g2d.drawOval(screenX - radius, screenY - radius, radius * 2, radius * 2);
+        g2d.setColor(new Color(255, 194, 108));
+        g2d.drawArc(screenX - radius, screenY - radius, radius * 2, radius * 2, 90, (int) Math.round(-360 * progress));
+        g2d.setComposite(oldComposite);
+        g2d.setStroke(oldStroke);
+    }
+
+    private void drawUI(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        drawTopStatusBar(g2d);
+        drawBottomRightHud(g2d);
     }
 
     private void drawArcadeOverlay(Graphics2D g2d) {
@@ -1112,6 +1741,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
         drawButton(g2d, getArcadeModeButtonBounds(), "Mode Arcade");
         drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
+        drawButton(g2d, getMissionModeButtonBounds(), "Mode Mission");
         drawButton(g2d, getProtectionModeButtonBounds(), "Mode Protection");
         drawButton(g2d, getOptionsButtonBounds(), "Options");
 
@@ -1241,11 +1871,13 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.translate(-tileManager.getCameraX() + shakeX, -tileManager.getCameraY() + shakeY);
         tileManager.draw(g2d);
         drawExtractionZone(g2d);
+        drawMissionWorldMarkers(g2d);
         ObjectManager.drawAll(g2d);
         g2d.setTransform(old);
 
         drawNightOverlay(g2d);
         drawArcadeOverlay(g2d);
+        drawReloadAnimation(g2d);
 
         if (screenState == ScreenState.PLAYING) {
             drawUI(g);

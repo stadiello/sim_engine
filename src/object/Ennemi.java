@@ -83,8 +83,20 @@ public class Ennemi extends Homme {
 
     @Override
     public void onDeath() {
-        if (GameMode.current == GameMode.STORY) {
-            ObjectManager.list.add(new DroppedWeapon(x, y, carriedWeapon));
+        if (GameMode.current == GameMode.STORY || GameMode.current == GameMode.MISSION) {
+            int droppedMagAmmo = Math.max(0, Math.min(
+                carriedWeapon.getMagazineCapacity(),
+                carriedWeapon.getMagazineCapacity() / 2 + (int) (Math.random() * (carriedWeapon.getMagazineCapacity() / 2.0 + 1))
+            ));
+            int droppedReserveAmmo = GameMode.current == GameMode.MISSION
+                ? carriedWeapon.getMagazineCapacity() * (1 + (int) (Math.random() * 2))
+                : carriedWeapon.getMagazineCapacity();
+            ObjectManager.list.add(new DroppedWeapon(x, y, carriedWeapon.withAmmo(droppedMagAmmo, droppedReserveAmmo)));
+        }
+
+        if (GameMode.current == GameMode.MISSION) {
+            int looseAmmo = Math.max(4, carriedWeapon.getMagazineCapacity() / 2 + (int) (Math.random() * Math.max(4, carriedWeapon.getMagazineCapacity())));
+            ObjectManager.list.add(new DroppedAmmo(x + 12 - Math.random() * 24, y + 10 - Math.random() * 20, carriedWeapon, looseAmmo));
         }
 
         double armorDropChance = GameMode.current == GameMode.ARCADE

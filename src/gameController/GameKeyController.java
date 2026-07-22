@@ -17,7 +17,11 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     private volatile boolean leftClickTriggered;
     private volatile boolean rightClickTriggered;
     private volatile boolean pauseToggleTriggered;
+    private volatile boolean interactTriggered;
+    private volatile boolean reloadTriggered;
     private boolean pauseKeyPressed;
+    private boolean interactKeyPressed;
+    private boolean reloadKeyPressed;
     private volatile int mouseX = 400;
     private volatile int mouseY = 300;
     private volatile int rightClickX = 400;
@@ -51,6 +55,26 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
                     pauseKeyPressed = false;
                 }
             }
+            case KeyEvent.VK_E -> {
+                if (pressed) {
+                    if (!interactKeyPressed) {
+                        interactTriggered = true;
+                    }
+                    interactKeyPressed = true;
+                } else {
+                    interactKeyPressed = false;
+                }
+            }
+            case KeyEvent.VK_R -> {
+                if (pressed) {
+                    if (!reloadKeyPressed) {
+                        reloadTriggered = true;
+                    }
+                    reloadKeyPressed = true;
+                } else {
+                    reloadKeyPressed = false;
+                }
+            }
         }
         return false; // Ne pas consommer l'événement
     }
@@ -76,6 +100,16 @@ public class GameKeyController implements KeyEventDispatcher, MouseMotionListene
     public boolean consumePauseToggleTriggered() {
         boolean wasTriggered = pauseToggleTriggered;
         pauseToggleTriggered = false;
+        return wasTriggered;
+    }
+    public boolean consumeInteractTriggered() {
+        boolean wasTriggered = interactTriggered;
+        interactTriggered = false;
+        return wasTriggered;
+    }
+    public boolean consumeReloadTriggered() {
+        boolean wasTriggered = reloadTriggered;
+        reloadTriggered = false;
         return wasTriggered;
     }
     public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
