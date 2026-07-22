@@ -1014,8 +1014,8 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getPauseMenuButtonBounds() {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
-        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int panelWidth = getViewWidth();
+        int panelHeight = getViewHeight();
         int buttonWidth = 220;
         int buttonHeight = 48;
         int x = (panelWidth - buttonWidth) / 2;
@@ -1024,8 +1024,8 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getFreeModeButtonBounds() {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
-        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int panelWidth = getViewWidth();
+        int panelHeight = getViewHeight();
         int buttonWidth = 220;
         int buttonHeight = 48;
         int x = (panelWidth - buttonWidth) / 2;
@@ -1059,7 +1059,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getMapCardBounds(int index, int total) {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelWidth = getViewWidth();
         int cardHeight = 130;
         int maxCardWidth = 250;
         int availableWidth = panelWidth - 120 - (total - 1) * MENU_MAP_CARD_GAP;
@@ -1094,8 +1094,8 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getBackButtonBounds() {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
-        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int panelWidth = getViewWidth();
+        int panelHeight = getViewHeight();
         int buttonWidth = 220;
         int buttonHeight = 52;
         int x = (panelWidth - buttonWidth) / 2;
@@ -1104,14 +1104,14 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getAiMinusButtonBounds(int rowIndex) {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelWidth = getViewWidth();
         int x = panelWidth - 210;
         int y = AI_OPTIONS_BASE_Y + rowIndex * AI_OPTION_ROW_GAP - 22;
         return new Rectangle(x, y, 34, 26);
     }
 
     private Rectangle getAiPlusButtonBounds(int rowIndex) {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
+        int panelWidth = getViewWidth();
         int x = panelWidth - 168;
         int y = AI_OPTIONS_BASE_Y + rowIndex * AI_OPTION_ROW_GAP - 22;
         return new Rectangle(x, y, 34, 26);
@@ -1154,8 +1154,8 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Rectangle getReplayButtonBounds() {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
-        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int panelWidth = getViewWidth();
+        int panelHeight = getViewHeight();
         int buttonWidth = 240;
         int buttonHeight = 56;
         int x = (panelWidth - buttonWidth) / 2;
@@ -1188,9 +1188,17 @@ public class GamePanel extends JPanel implements Runnable {
             return;
         }
 
-        int viewWidth = getWidth() > 0 ? getWidth() : 800;
-        int viewHeight = getHeight() > 0 ? getHeight() : 600;
+        int viewWidth = getViewWidth();
+        int viewHeight = getViewHeight();
         tileManager.centerCameraOn(protagonist.x, protagonist.y, viewWidth, viewHeight);
+    }
+
+    private int getViewWidth() {
+        return getWidth() > 0 ? getWidth() : 800;
+    }
+
+    private int getViewHeight() {
+        return getHeight() > 0 ? getHeight() : 600;
     }
 
     private double getExtractionX() {
@@ -1753,8 +1761,8 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawOptions(Graphics2D g2d) {
-        int panelWidth = getWidth() > 0 ? getWidth() : 800;
-        int panelHeight = getHeight() > 0 ? getHeight() : 600;
+        int panelWidth = getViewWidth();
+        int panelHeight = getViewHeight();
 
         g2d.setColor(new Color(0, 0, 0, 185));
         g2d.fillRect(0, 0, panelWidth, panelHeight);
@@ -1765,11 +1773,6 @@ public class GamePanel extends JPanel implements Runnable {
         String title = "Options";
         FontMetrics titleFm = g2d.getFontMetrics();
         g2d.drawString(title, (panelWidth - titleFm.stringWidth(title)) / 2, 130);
-
-        // g2d.setFont(oldFont.deriveFont(Font.PLAIN, 20f));
-        // g2d.drawString("- P : mettre le jeu en pause/reprendre", 130, 190);
-        // g2d.drawString("- Clic droit : envoyer le soldat", 130, 220);
-        // g2d.drawString("- Clic gauche : tirer", 130, 250);
 
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 22f));
         g2d.drawString("Options de partie et IA", 130, AI_OPTIONS_BASE_Y - 34);

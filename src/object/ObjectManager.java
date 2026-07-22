@@ -227,48 +227,35 @@ public class ObjectManager {
 
     public static Homme getNearestAlliedTarget(double x, double y) {
         synchronized (LOCK) {
-            Homme nearest = null;
-            double minDist = Double.MAX_VALUE;
-
-            for (Homme ally : alliedTargets) {
-                if (pendingRemovalSet.contains(ally)) {
-                    continue;
-                }
-
-                double dx = ally.x - x;
-                double dy = ally.y - y;
-                double dist = dx * dx + dy * dy;
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = ally;
-                }
-            }
-
-            return nearest;
+            return getNearestHumanUnlocked(alliedTargets, x, y);
         }
     }
 
     public static Homme getNearestHostileForSoldat(double x, double y) {
         synchronized (LOCK) {
-            Homme nearest = null;
-            double minDist = Double.MAX_VALUE;
+            return getNearestHumanUnlocked(soldierHostiles, x, y);
+        }
+    }
 
-            for (Homme hostile : soldierHostiles) {
-                if (pendingRemovalSet.contains(hostile)) {
-                    continue;
-                }
+    private static Homme getNearestHumanUnlocked(ArrayList<Homme> candidates, double x, double y) {
+        Homme nearest = null;
+        double minDist = Double.MAX_VALUE;
 
-                double dx = hostile.x - x;
-                double dy = hostile.y - y;
-                double dist = dx * dx + dy * dy;
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = hostile;
-                }
+        for (Homme candidate : candidates) {
+            if (pendingRemovalSet.contains(candidate)) {
+                continue;
             }
 
-            return nearest;
+            double dx = candidate.x - x;
+            double dy = candidate.y - y;
+            double dist = dx * dx + dy * dy;
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = candidate;
+            }
         }
+
+        return nearest;
     }
 
     public static Protagonist getProtagonist() {

@@ -17,12 +17,7 @@ public class Protagonist extends Homme{
     private static final double SPRINT_MOVE_SPEED_MULTIPLIER = 1.45;
     private static final int MAX_ARMOR_PLATES = 3;
 
-    // private static final double WALK_CYCLE_SPEED = 0.42;
-    // private static final double WALK_BLEND_RATE = 0.18;
-
     private static Image imgCorps;
-    // private static Image imgPied_d;
-    // private static Image imgPied_g;
     private final ArrayList<Weapon> loadout;
     private boolean shot = false;
 
@@ -36,14 +31,10 @@ public class Protagonist extends Homme{
     private double facingY;
     private int selectedWeaponIndex = 0;
     private int armorPlates = 0;
-    // private double walkCycle = 0;
-    // private double walkBlend = 0;
 
     static {
         try {
             imgCorps = ImageIO.read(Soldat.class.getResourceAsStream("/assets/soldats/corps.png"));
-            // imgPied_d = ImageIO.read(Soldat.class.getResourceAsStream("/assets/civils/pied_d.png"));
-            // imgPied_g = ImageIO.read(Soldat.class.getResourceAsStream("/assets/civils/pied_g.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -52,14 +43,9 @@ public class Protagonist extends Homme{
     public Protagonist(double x, double y, GameKeyController keyController) {
         super(x, y);
         this.keyController = keyController;
-        Weapon[] initial = (GameMode.current == GameMode.STORY
-            || GameMode.current == GameMode.PROTECTION
-            || GameMode.current == GameMode.MISSION)
-                ? Weapon.storyLoadout()
-                : Weapon.protagonistLoadout();
         this.loadout = new ArrayList<>();
-        for (Weapon w : initial) {
-            loadout.add(w);
+        for (Weapon weapon : getInitialLoadout()) {
+            loadout.add(weapon);
         }
         vx = 0;
         vy = 0;
@@ -67,25 +53,44 @@ public class Protagonist extends Homme{
         facingY = -1;
     }
 
-    /** Ajoute une arme au loadout si elle n'est pas déjà présente. Retourne true si ajoutée. */
-    public boolean addWeapon(Weapon weapon) {
+    private static Weapon[] getInitialLoadout() {
+        return isMissionStyleMode() ? Weapon.storyLoadout() : Weapon.protagonistLoadout();
+    }
+
+    private static boolean isMissionStyleMode() {
+        return GameMode.current == GameMode.STORY
+                || GameMode.current == GameMode.PROTECTION
+                || GameMode.current == GameMode.MISSION;
+    }
+
+    private Weapon findMatchingWeapon(Weapon weapon) {
+        if (weapon == null) {
+            return null;
+        }
+
         for (Weapon current : loadout) {
             if (current.isSameModel(weapon)) {
-                current.mergeAmmoFrom(weapon);
-                return true;
+                return current;
             }
         }
+
+        return null;
+    }
+
+    /** Ajoute une arme au loadout si elle n'est pas déjà présente. Retourne true si ajoutée. */
+    public boolean addWeapon(Weapon weapon) {
+        Weapon matchingWeapon = findMatchingWeapon(weapon);
+        if (matchingWeapon != null) {
+            matchingWeapon.mergeAmmoFrom(weapon);
+            return true;
+        }
+
         loadout.add(weapon);
         return true;
     }
 
     public boolean hasWeapon(Weapon weapon) {
-        for (Weapon current : loadout) {
-            if (current.isSameModel(weapon)) {
-                return true;
-            }
-        }
-        return false;
+        return findMatchingWeapon(weapon) != null;
     }
 
     public boolean addAmmoForWeapon(Weapon weapon, int reserveAmmo) {
@@ -93,12 +98,8 @@ public class Protagonist extends Homme{
             return false;
         }
 
-        for (Weapon current : loadout) {
-            if (current.isSameModel(weapon)) {
-                return current.addReserveAmmo(reserveAmmo) > 0;
-            }
-        }
-        return false;
+        Weapon matchingWeapon = findMatchingWeapon(weapon);
+        return matchingWeapon != null && matchingWeapon.addReserveAmmo(reserveAmmo) > 0;
     }
 
     public boolean addArmorPlate() {
@@ -221,22 +222,14 @@ public class Protagonist extends Homme{
         }
 
         int weaponScrollDelta = keyController.consumeWeaponScrollDelta();
-        if (weaponScrollDelta != 0 && loadout.size() > 0 && reloadTimer == 0) {
+        if (weaponScrollDelta != 0 && !loadout.isEmpty() && reloadTimer == 0) {
             selectedWeaponIndex = Math.floorMod(selectedWeaponIndex + weaponScrollDelta, loadout.size());
         }
 
         if (shootCooldown > 0) {
-                shootCooldown--;
+            shootCooldown--;
         }
-        if (reloadTimer > 0) {
-            reloadTimer--;
-            if (reloadTimer == 0) {
-                Weapon weapon = getCurrentWeapon();
-                if (weapon != null) {
-                    weapon.reload();
-                }
-            }
-        }
+        tickReload();
 
         double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
         if (GameMode.current == GameMode.ARCADE) {
@@ -251,8 +244,8 @@ public class Protagonist extends Homme{
         if (keyController.isUp()) inputY -= 1;
         if (keyController.isDown()) inputY += 1;
         Weapon currentWeapon = getCurrentWeapon();
-        if (keyController.consumeReloadTriggered() && currentWeapon != null && reloadTimer == 0 && currentWeapon.canReload()) {
-            reloadTimer = currentWeapon.getReloadFrames();
+        if (keyController.consumeReloadTriggered()) {
+            startReloadIfPossible(currentWeapon);
         }
         boolean leftClickTriggered = keyController.consumeLeftClickPressed();
         boolean shouldFire = currentWeapon != null
@@ -260,12 +253,7 @@ public class Protagonist extends Homme{
                 && reloadTimer == 0
                 && (currentWeapon.isAutomatic() ? keyController.isLeftClickPressed() : leftClickTriggered);
         if (shouldFire) {
-            if (currentWeapon.fire(this, facingX, facingY)) {
-                shootCooldown = currentWeapon.getCooldownFrames();
-                shot = true;
-            } else if (currentWeapon.canReload()) {
-                reloadTimer = currentWeapon.getReloadFrames();
-            }
+            tryFireCurrentWeapon(currentWeapon);
         }
 
         if (inputX != 0 || inputY != 0) {
@@ -281,48 +269,52 @@ public class Protagonist extends Homme{
         }
 
         moveWithTileCollision(14);
-
-        // double movedDistance = Math.hypot(x - startX, y - startY);
-        // double targetWalkBlend = Math.min(1.0, movedDistance / MOVE_SPEED);
-        // walkBlend += (targetWalkBlend - walkBlend) * WALK_BLEND_RATE;
-        // if (movedDistance > 0.001) {
-        //     walkCycle += movedDistance * WALK_CYCLE_SPEED;
-        // }
-
         timer++;
 
+    }
+
+    private void tickReload() {
+        if (reloadTimer <= 0) {
+            return;
+        }
+
+        reloadTimer--;
+        if (reloadTimer == 0) {
+            Weapon weapon = getCurrentWeapon();
+            if (weapon != null) {
+                weapon.reload();
+            }
+        }
+    }
+
+    private void startReloadIfPossible(Weapon weapon) {
+        if (weapon != null && reloadTimer == 0 && weapon.canReload()) {
+            reloadTimer = weapon.getReloadFrames();
+        }
+    }
+
+    private void tryFireCurrentWeapon(Weapon weapon) {
+        if (weapon.fire(this, facingX, facingY)) {
+            shootCooldown = weapon.getCooldownFrames();
+            shot = true;
+            return;
+        }
+
+        startReloadIfPossible(weapon);
     }
 
     @Override
     public void draw(Graphics g) {
         Graphics2D g2d = (Graphics2D) g;
-        
-        double drawVx = facingX;
-        double drawVy = facingY;
         Weapon currentWeapon = getCurrentWeapon();
 
-        double angle = Math.atan2(drawVy, drawVx) + Math.PI / 2;
+        double angle = Math.atan2(facingY, facingX) + Math.PI / 2;
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
 
-        // double stride = Math.sin(walkCycle);
-        // double bounce = Math.cos(walkCycle);
-        // int bodyBob = (int) Math.round(Math.abs(stride) * 2.0 * walkBlend);
-        // int footSpreadOffset = (int) Math.round(bounce * 1.5 * walkBlend);
-        // int rightFootForward = (int) Math.round(stride * 5.5 * walkBlend);
-        // int leftFootForward = (int) Math.round(-stride * 5.5 * walkBlend);
-        // int rightFootLift = (int) Math.round(Math.max(0.0, -bounce) * 3.0 * walkBlend);
-        // int leftFootLift = (int) Math.round(Math.max(0.0, bounce) * 3.0 * walkBlend);
-
         g2d.rotate(angle, x, y);
-        
-        // g2d.drawImage(imgPied_d, (int) x +5 - footSpreadOffset, (int) y-6  - rightFootForward - rightFootLift + bodyBob, 7, 15, null);
-        // g2d.drawImage(imgPied_g, (int) x -5 + footSpreadOffset, (int) y-6 - leftFootForward - leftFootLift + bodyBob, 7, 15, null);
-        // g2d.drawImage(imgCorps, (int) x - 16, (int) y - 16 - bodyBob, 32, 42, null);
-        
-        g2d.drawImage(imgCorps, (int)x - 16, (int)y - 16, 32, 42, null);
 
+        g2d.drawImage(imgCorps, (int) x - 16, (int) y - 16, 32, 42, null);
 
-        // gérer le recule de l'arme lors du tir
         if (currentWeapon != null) {
             currentWeapon.draw(g2d, x, y, timer, shot);
         }
