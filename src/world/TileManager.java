@@ -32,6 +32,7 @@ public class TileManager {
     int[][] tileDamage;
     private double cameraX;
     private double cameraY;
+    private final ThreadLocal<int[]> renderCameraOverride = new ThreadLocal<>();
     private MapType currentMapType = MapType.CITY;
 
     public TileManager(GamePanel gp) {
@@ -769,21 +770,38 @@ public class TileManager {
     }
 
     public void centerCameraOn(double worldX, double worldY, int viewWidth, int viewHeight) {
+        int[] centered = calculateCameraFor(worldX, worldY, viewWidth, viewHeight);
+        cameraX = centered[0];
+        cameraY = centered[1];
+    }
+
+    public int[] calculateCameraFor(double worldX, double worldY, int viewWidth, int viewHeight) {
         double targetCameraX = worldX - viewWidth / 2.0;
         double targetCameraY = worldY - viewHeight / 2.0;
-
         double maxX = Math.max(0, getWorldWidth() - viewWidth);
         double maxY = Math.max(0, getWorldHeight() - viewHeight);
+        int centeredX = (int) Math.round(Math.max(0, Math.min(targetCameraX, maxX)));
+        int centeredY = (int) Math.round(Math.max(0, Math.min(targetCameraY, maxY)));
+        return new int[]{centeredX, centeredY};
+    }
 
-        cameraX = Math.max(0, Math.min(targetCameraX, maxX));
-        cameraY = Math.max(0, Math.min(targetCameraY, maxY));
+    public void setRenderCameraOverride(int cameraX, int cameraY) {
+        renderCameraOverride.set(new int[]{cameraX, cameraY});
+    }
+
+    public void clearRenderCameraOverride() {
+        renderCameraOverride.remove();
     }
 
     public int getCameraX() {
+        int[] override = renderCameraOverride.get();
+        if (override != null) return override[0];
         return (int) Math.round(cameraX);
     }
 
     public int getCameraY() {
+        int[] override = renderCameraOverride.get();
+        if (override != null) return override[1];
         return (int) Math.round(cameraY);
     }
 

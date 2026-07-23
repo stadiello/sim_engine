@@ -146,6 +146,12 @@ public class ObjectManager {
         return livingHumans;
     }
 
+    public static ArrayList<GameObject> getObjectSnapshot() {
+        synchronized (LOCK) {
+            return new ArrayList<>(list);
+        }
+    }
+
     public static void alertAliensToAggressor(Homme aggressor) {
         if (aggressor == null) {
             return;

@@ -12,6 +12,8 @@ import gameController.GameKeyController;
 import gameController.RemotePlayerInput;
 import network.LanClientViewer;
 import network.LanHost;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 import object.GameObject;
 import object.ai.AiTuning;
 import object.ai.TacticalMovement;
@@ -25,7 +27,14 @@ import object.Ennemi.EnemyArchetype;
 import object.Homme;
 import object.Hostage;
 import object.ImpactSpark;
+import object.Projectile;
 import object.Protagonist;
+import object.DroppedAmmo;
+import object.DroppedArmor;
+import object.DroppedWeapon;
+import object.RocketBlastCloud;
+import object.TeslaArc;
+import object.Douille;
 import object.Shockwave;
 import object.Soldat;
 import object.ObjectManager;
@@ -109,6 +118,10 @@ public class GamePanel extends JPanel implements Runnable {
     private volatile RemotePlayerInput remotePlayerInput;
     private volatile Protagonist remoteProtagonist;
     private volatile LanHost lanHost;
+    private final ThreadLocal<Protagonist> renderedPlayerOverride = new ThreadLocal<>();
+    private volatile WorldSnapshot networkSnapshot;
+    private volatile boolean networkReplicaView;
+    private volatile String networkConnectionStatus = "Connexion a l'hote...";
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
     private String gameOverTitle = "VOUS ETES MORT";
@@ -158,6 +171,124 @@ public class GamePanel extends JPanel implements Runnable {
         if (lanHost != null) return;
         lanHost = new LanHost(this, port);
         lanHost.start();
+    }
+
+    public GameKeyController getKeyController() {
+        return keyController;
+    }
+
+    public void configureNetworkReplicaView() {
+        networkReplicaView = true;
+        screenState = ScreenState.MENU;
+    }
+
+    public void setNetworkConnectionStatus(String status) {
+        networkConnectionStatus = status == null ? "" : status;
+        repaint();
+    }
+
+    public void showNetworkConnectionError(String status) {
+        networkSnapshot = null;
+        setNetworkConnectionStatus(status);
+    }
+
+    public void applyNetworkSnapshot(WorldSnapshot snapshot) {
+        if (snapshot == null) return;
+        networkSnapshot = snapshot;
+        MapType[] maps = MapType.values();
+        if (snapshot.mapType >= 0 && snapshot.mapType < maps.length) {
+            tileManager.setCurrentMapType(maps[snapshot.mapType]);
+        }
+        GameMode[] modes = GameMode.values();
+        if (snapshot.gameMode >= 0 && snapshot.gameMode < modes.length) {
+            GameMode.current = modes[snapshot.gameMode];
+        }
+        ScreenState[] states = ScreenState.values();
+        if (snapshot.screenState >= 0 && snapshot.screenState < states.length) {
+            screenState = states[snapshot.screenState];
+        }
+        score = snapshot.score;
+        ObjectManager.list.clear();
+        for (WorldSnapshot.Entity entity : snapshot.entities) {
+            ObjectManager.list.add(new NetworkReplica(entity));
+        }
+        tileManager.centerCameraOn(snapshot.playerX, snapshot.playerY, getViewWidth(), getViewHeight());
+        repaint();
+    }
+
+    public WorldSnapshot createSnapshotForRemote() {
+        WorldSnapshot snapshot = new WorldSnapshot();
+        snapshot.mapType = tileManager.getCurrentMapType().ordinal();
+        snapshot.gameMode = GameMode.current.ordinal();
+        snapshot.screenState = screenState.ordinal();
+        snapshot.score = score;
+        Protagonist remote = remoteProtagonist;
+        if (remote != null) {
+            snapshot.playerX = remote.x;
+            snapshot.playerY = remote.y;
+            snapshot.playerFacingX = remote.getFacingX();
+            snapshot.playerFacingY = remote.getFacingY();
+            snapshot.armor = remote.getArmorPlates();
+            snapshot.maxArmor = remote.getMaxArmorPlates();
+            snapshot.reloading = remote.isReloading();
+            snapshot.reloadProgress = remote.getReloadProgress();
+            if (remote.getCurrentWeapon() != null) {
+                snapshot.weaponName = remote.getCurrentWeapon().getName();
+                snapshot.ammo = remote.getCurrentWeapon().getAmmoInMagazine();
+                snapshot.reserveAmmo = remote.getCurrentWeapon().getReserveAmmo();
+            }
+        }
+        for (GameObject object : ObjectManager.getObjectSnapshot()) {
+            WorldSnapshot.Entity entity = toNetworkEntity(object, remote);
+            if (entity != null) snapshot.entities.add(entity);
+        }
+        return snapshot;
+    }
+
+    private WorldSnapshot.Entity toNetworkEntity(GameObject object, Protagonist remote) {
+        WorldSnapshot.Entity entity = new WorldSnapshot.Entity();
+        entity.x = object.x;
+        entity.y = object.y;
+        entity.vx = object.vx;
+        entity.vy = object.vy;
+        if (object instanceof Protagonist player) {
+            entity.type = NetworkReplica.PLAYER;
+            entity.facingX = player.getFacingX();
+            entity.facingY = player.getFacingY();
+            entity.localPlayer = player == remote;
+        } else if (object instanceof Soldat) {
+            entity.type = NetworkReplica.SOLDIER;
+        } else if (object instanceof Ennemi enemy) {
+            entity.type = NetworkReplica.ENEMY;
+            entity.variant = (byte) (enemy.getArchetype() == EnemyArchetype.ROQUETTE ? 2 : 1);
+            entity.facingX = enemy.getFacingX();
+            entity.facingY = enemy.getFacingY();
+        } else if (object instanceof Alien) {
+            entity.type = NetworkReplica.ALIEN;
+        } else if (object instanceof Homme) {
+            entity.type = NetworkReplica.CIVILIAN;
+        } else if (object instanceof Projectile projectile) {
+            entity.type = NetworkReplica.PROJECTILE;
+            entity.variant = (byte) (projectile.getProjectileType().ordinal() + 1);
+        } else if (object instanceof AmmoDepot) {
+            entity.type = NetworkReplica.AMMO_DEPOT;
+        } else if (object instanceof DeathMarker marker) {
+            entity.type = NetworkReplica.DEATH_MARKER;
+            entity.variant = (byte) marker.getNetworkVariant();
+        } else if (object instanceof DesertTurret turret) {
+            entity.type = NetworkReplica.TURRET;
+            entity.facingX = turret.getFacingX();
+            entity.facingY = turret.getFacingY();
+        } else if (object instanceof DroppedAmmo || object instanceof DroppedArmor || object instanceof DroppedWeapon) {
+            entity.type = NetworkReplica.PICKUP;
+        } else if (object instanceof ImpactSpark || object instanceof RocketBlastCloud
+                || object instanceof Shockwave || object instanceof TeslaArc
+                || object instanceof AlienTeleport || object instanceof Douille) {
+            entity.type = NetworkReplica.EFFECT;
+        } else {
+            return null;
+        }
+        return entity;
     }
 
     public void onRemotePlayerConnected(RemotePlayerInput input) {
@@ -948,6 +1079,7 @@ public class GamePanel extends JPanel implements Runnable {
             Protagonist interactionPlayer = consumeInteractionPlayer(protagonist);
             boolean interactionUsedByTurret = tryToggleDesertTurret(interactionPlayer);
             boolean interactionUsedByRevive = !interactionUsedByTurret && tryReviveAlly(interactionPlayer);
+            updateRemoteInputCamera();
             applySoldierMoveCommand();
             ObjectManager.updateAll();
             maintainAlienPresence();
@@ -1018,6 +1150,16 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
         return false;
+    }
+
+    private void updateRemoteInputCamera() {
+        Protagonist remote = remoteProtagonist;
+        if (remote == null) return;
+        RemotePlayerInput input = remotePlayerInput;
+        int viewWidth = input != null ? input.getViewWidth() : getViewWidth();
+        int viewHeight = input != null ? input.getViewHeight() : getViewHeight();
+        int[] camera = tileManager.calculateCameraFor(remote.x, remote.y, viewWidth, viewHeight);
+        remote.setIndependentCamera(camera[0], camera[1]);
     }
 
     private void maintainAlienPresence() {
@@ -1452,14 +1594,12 @@ public class GamePanel extends JPanel implements Runnable {
 
         int viewWidth = getViewWidth();
         int viewHeight = getViewHeight();
-        double cameraTargetX = protagonist.x;
-        double cameraTargetY = protagonist.y;
-        Protagonist remote = remoteProtagonist;
-        if (remote != null) {
-            cameraTargetX = (cameraTargetX + remote.x) / 2.0;
-            cameraTargetY = (cameraTargetY + remote.y) / 2.0;
-        }
-        tileManager.centerCameraOn(cameraTargetX, cameraTargetY, viewWidth, viewHeight);
+        tileManager.centerCameraOn(protagonist.x, protagonist.y, viewWidth, viewHeight);
+    }
+
+    private Protagonist getRenderedPlayer() {
+        Protagonist override = renderedPlayerOverride.get();
+        return override != null ? override : ObjectManager.getProtagonist();
     }
 
     private int getViewWidth() {
@@ -1581,7 +1721,8 @@ public class GamePanel extends JPanel implements Runnable {
 
         darknessG.setComposite(AlphaComposite.Clear);
 
-        Protagonist protagonist = ObjectManager.getProtagonist();
+        Protagonist protagonist = getRenderedPlayer();
+        WorldSnapshot replicated = networkReplicaView ? networkSnapshot : null;
         if (protagonist != null) {
             drawFlashlightCone(
                     darknessG,
@@ -1589,6 +1730,17 @@ public class GamePanel extends JPanel implements Runnable {
                     protagonist.y,
                     protagonist.getFacingX(),
                     protagonist.getFacingY(),
+                    PLAYER_FLASHLIGHT_RANGE,
+                    PLAYER_FLASHLIGHT_HALF_ANGLE,
+                    42
+            );
+        } else if (replicated != null) {
+            drawFlashlightCone(
+                    darknessG,
+                    replicated.playerX,
+                    replicated.playerY,
+                    replicated.playerFacingX,
+                    replicated.playerFacingY,
                     PLAYER_FLASHLIGHT_RANGE,
                     PLAYER_FLASHLIGHT_HALF_ANGLE,
                     42
@@ -1750,7 +1902,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private String[] getTopHudDetails() {
-        Protagonist protagonist = ObjectManager.getProtagonist();
+        Protagonist protagonist = getRenderedPlayer();
         if (GameMode.current == GameMode.MISSION) {
             return getMissionTopHudDetails();
         }
@@ -1814,7 +1966,11 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void drawBottomRightHud(Graphics2D g2d) {
-        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (networkReplicaView && networkSnapshot != null) {
+            drawNetworkPlayerHud(g2d, networkSnapshot);
+            return;
+        }
+        Protagonist protagonist = getRenderedPlayer();
         if (protagonist == null) {
             return;
         }
@@ -1878,8 +2034,44 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.setFont(oldFont);
     }
 
+    private void drawNetworkPlayerHud(Graphics2D g2d, WorldSnapshot snapshot) {
+        int panelWidth = 250;
+        int panelHeight = snapshot.reloading ? 154 : 136;
+        int x = getWidth() - panelWidth - 18;
+        int y = getHeight() - panelHeight - 18;
+        drawPanelBackground(g2d, x, y, panelWidth, panelHeight,
+                new Color(10, 12, 20, 205), new Color(105, 225, 160, 180));
+        Font oldFont = g2d.getFont();
+        g2d.setColor(new Color(105, 235, 165));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 13f));
+        g2d.drawString("JOUEUR 2", x + 16, y + 22);
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 20f));
+        g2d.drawString(snapshot.weaponName, x + 16, y + 50);
+        g2d.setColor(new Color(255, 222, 140));
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 30f));
+        g2d.drawString(snapshot.ammo + " / " + snapshot.reserveAmmo, x + 16, y + 84);
+        int plateY = y + panelHeight - 34;
+        for (int i = 0; i < snapshot.maxArmor; i++) {
+            g2d.setColor(i < snapshot.armor ? new Color(108, 214, 255) : new Color(36, 50, 68));
+            g2d.fillRoundRect(x + 16 + i * 24, plateY, 18, 18, 5, 5);
+        }
+        if (snapshot.reloading) {
+            g2d.setColor(new Color(32, 40, 52));
+            g2d.fillRoundRect(x + 16, y + panelHeight - 60, panelWidth - 32, 10, 8, 8);
+            g2d.setColor(new Color(255, 176, 92));
+            g2d.fillRoundRect(x + 16, y + panelHeight - 60,
+                    (int) Math.round((panelWidth - 32) * snapshot.reloadProgress), 10, 8, 8);
+        }
+        g2d.setFont(oldFont);
+    }
+
     private void drawReloadAnimation(Graphics2D g2d) {
-        Protagonist protagonist = ObjectManager.getProtagonist();
+        if (networkReplicaView && networkSnapshot != null) {
+            drawNetworkReloadAnimation(g2d, networkSnapshot);
+            return;
+        }
+        Protagonist protagonist = getRenderedPlayer();
         if (protagonist == null || !protagonist.isReloading()) {
             return;
         }
@@ -1901,6 +2093,16 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawArc(screenX - radius, screenY - radius, radius * 2, radius * 2, 90, (int) Math.round(-360 * progress));
         g2d.setComposite(oldComposite);
         g2d.setStroke(oldStroke);
+    }
+
+    private void drawNetworkReloadAnimation(Graphics2D g2d, WorldSnapshot snapshot) {
+        if (!snapshot.reloading) return;
+        int screenX = (int) Math.round(snapshot.playerX - tileManager.getCameraX());
+        int screenY = (int) Math.round(snapshot.playerY - tileManager.getCameraY() - 34);
+        g2d.setColor(new Color(255, 194, 108));
+        g2d.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.drawArc(screenX - 18, screenY - 18, 36, 36, 90,
+                (int) Math.round(-360 * snapshot.reloadProgress));
     }
 
     private void drawUI(Graphics g) {
@@ -2245,6 +2447,20 @@ public class GamePanel extends JPanel implements Runnable {
         } else if (screenState == ScreenState.OPTIONS) {
             drawOptions(g2d);
         }
+        if (networkReplicaView && networkSnapshot == null) {
+            drawNetworkConnectionOverlay(g2d);
+        }
+    }
+
+    private void drawNetworkConnectionOverlay(Graphics2D g2d) {
+        g2d.setColor(new Color(0, 0, 0, 205));
+        g2d.fillRect(0, 0, getViewWidth(), getViewHeight());
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(g2d.getFont().deriveFont(Font.BOLD, 20f));
+        FontMetrics metrics = g2d.getFontMetrics();
+        g2d.drawString(networkConnectionStatus,
+                (getViewWidth() - metrics.stringWidth(networkConnectionStatus)) / 2,
+                getViewHeight() / 2);
     }
 
     public BufferedImage captureFrame() {
@@ -2258,6 +2474,21 @@ public class GamePanel extends JPanel implements Runnable {
             graphics.dispose();
         }
         return image;
+    }
+
+    public BufferedImage captureRemoteFrame() {
+        Protagonist remote = remoteProtagonist;
+        if (remote == null) return captureFrame();
+
+        int[] camera = tileManager.calculateCameraFor(remote.x, remote.y, getViewWidth(), getViewHeight());
+        tileManager.setRenderCameraOverride(camera[0], camera[1]);
+        renderedPlayerOverride.set(remote);
+        try {
+            return captureFrame();
+        } finally {
+            renderedPlayerOverride.remove();
+            tileManager.clearRenderCameraOverride();
+        }
     }
 
     public void paintScore(Graphics g, int scoreHit) {

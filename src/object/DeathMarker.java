@@ -107,6 +107,15 @@ public final class DeathMarker extends GameObject {
         return false;
     }
 
+    public int getNetworkVariant() {
+        return switch (type) {
+            case ALLY -> 1;
+            case HOSTILE -> 2;
+            case ALIEN -> 3;
+            case CIVILIAN -> 4;
+        };
+    }
+
     private void drawHumanMarker(Graphics2D g2d) {
         Color fill = switch (type) {
             case ALLY -> new Color(46, 116, 168);

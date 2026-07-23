@@ -3,26 +3,17 @@ package network;
 import gameController.RemotePlayerInput;
 import main.GamePanel;
 
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
-import javax.swing.SwingUtilities;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class LanHost implements AutoCloseable {
     public static final int DEFAULT_PORT = 28765;
-    private static final String MAGIC = "SIM_ENGINE_LAN_1";
+    private static final String MAGIC = "SIM_ENGINE_LAN_2";
     private final GamePanel panel;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean();
@@ -97,12 +88,9 @@ public final class LanHost implements AutoCloseable {
             receiver.start();
 
             while (running.get() && !socket.isClosed()) {
-                BufferedImage image = capturePanel();
-                byte[] jpeg = encodeJpeg(image);
-                output.writeInt(jpeg.length);
-                output.write(jpeg);
+                panel.createSnapshotForRemote().write(output);
                 output.flush();
-                Thread.sleep(50);
+                Thread.sleep(16);
             }
         } catch (IOException e) {
             if (running.get()) status = "Connexion perdue";
@@ -120,7 +108,8 @@ public final class LanHost implements AutoCloseable {
                 remoteInput.apply(
                         input.readBoolean(), input.readBoolean(), input.readBoolean(), input.readBoolean(),
                         input.readBoolean(), input.readBoolean(), input.readBoolean(), input.readBoolean(),
-                        input.readBoolean(), input.readInt(), input.readInt(), input.readInt()
+                        input.readBoolean(), input.readInt(), input.readInt(), input.readInt(),
+                        input.readInt(), input.readInt()
                 );
             }
         } catch (IOException ignored) {
@@ -128,34 +117,6 @@ public final class LanHost implements AutoCloseable {
                 if (clientSocket != null) clientSocket.close();
             } catch (IOException ignoredAgain) {}
         }
-    }
-
-    private BufferedImage capturePanel() throws IOException {
-        AtomicReference<BufferedImage> result = new AtomicReference<>();
-        Runnable capture = () -> result.set(panel.captureFrame());
-        try {
-            if (SwingUtilities.isEventDispatchThread()) capture.run();
-            else SwingUtilities.invokeAndWait(capture);
-        } catch (Exception e) {
-            throw new IOException("capture impossible", e);
-        }
-        return result.get();
-    }
-
-    private byte[] encodeJpeg(BufferedImage image) throws IOException {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(64 * 1024);
-        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
-        ImageWriter writer = writers.next();
-        try (ImageOutputStream imageOutput = ImageIO.createImageOutputStream(bytes)) {
-            writer.setOutput(imageOutput);
-            ImageWriteParam params = writer.getDefaultWriteParam();
-            params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            params.setCompressionQuality(0.68f);
-            writer.write(null, new IIOImage(image, null, null), params);
-        } finally {
-            writer.dispose();
-        }
-        return bytes.toByteArray();
     }
 
     @Override

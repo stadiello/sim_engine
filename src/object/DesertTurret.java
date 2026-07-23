@@ -10,7 +10,6 @@ import java.awt.geom.AffineTransform;
 
 import gameController.PlayerInput;
 import object.weapon.Weapon;
-import world.TileManager;
 
 /** Tourelle alliée fixe réservée à la position fortifiée du Désert tactique. */
 public final class DesertTurret extends GameObject {
@@ -42,9 +41,8 @@ public final class DesertTurret extends GameObject {
         }
 
         PlayerInput input = operator.getPlayerInput();
-        TileManager tiles = ObjectManager.getTileManager();
-        double aimX = input.getMouseX() + (tiles != null ? tiles.getCameraX() : 0);
-        double aimY = input.getMouseY() + (tiles != null ? tiles.getCameraY() : 0);
+        double aimX = input.getMouseX() + operator.getInputCameraX();
+        double aimY = input.getMouseY() + operator.getInputCameraY();
         double dx = aimX - x;
         double dy = aimY - y;
         double distance = Math.hypot(dx, dy);
@@ -84,6 +82,14 @@ public final class DesertTurret extends GameObject {
 
     public boolean isOperatedBy(Protagonist player) {
         return operator == player;
+    }
+
+    public double getFacingX() {
+        return facingX;
+    }
+
+    public double getFacingY() {
+        return facingY;
     }
 
     private void releaseOperator() {

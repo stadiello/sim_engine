@@ -49,11 +49,12 @@ meme reseau local.
 Le port TCP utilise par defaut est `28765`. Le pare-feu de l'ordinateur hote peut
 demander d'autoriser les connexions entrantes pour Java ou SimEngine.
 
-Cette premiere version est autoritaire : l'hote execute la simulation et diffuse
-l'image au joueur 2, qui lui envoie ses commandes. Les deux joueurs partagent donc
-la meme camera et doivent rester relativement proches. Les mouvements, la visee,
-les tirs, le rechargement, le changement d'arme et les interactions de mission du
-joueur 2 sont transmis a l'hote.
+Cette version est autoritaire : l'hote execute la simulation et le joueur 2 lui
+envoie ses commandes. Le monde est transmis sous forme d'instantanes binaires et
+le client dessine localement la carte, les personnages et le HUD avec les assets
+originaux, sans streaming video ni compression JPEG. L'hote et le joueur 2
+possedent chacun une camera independante et peuvent explorer des zones differentes
+de la carte.
 
 ## Marqueurs de morts et depots
 

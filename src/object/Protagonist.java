@@ -34,6 +34,8 @@ public class Protagonist extends Homme{
     private int selectedWeaponIndex = 0;
     private int armorPlates = 0;
     private boolean controlsEnabled = true;
+    private int independentCameraX;
+    private int independentCameraY;
 
     static {
         try {
@@ -75,6 +77,21 @@ public class Protagonist extends Homme{
             vx = 0;
             vy = 0;
         }
+    }
+
+    public void setIndependentCamera(int cameraX, int cameraY) {
+        independentCameraX = cameraX;
+        independentCameraY = cameraY;
+    }
+
+    public int getInputCameraX() {
+        TileManager tileManager = ObjectManager.getTileManager();
+        return primaryPlayer && tileManager != null ? tileManager.getCameraX() : independentCameraX;
+    }
+
+    public int getInputCameraY() {
+        TileManager tileManager = ObjectManager.getTileManager();
+        return primaryPlayer && tileManager != null ? tileManager.getCameraY() : independentCameraY;
     }
 
     private static Weapon[] getInitialLoadout() {
@@ -249,9 +266,8 @@ public class Protagonist extends Homme{
         double inputX = 0;
         double inputY = 0;
 
-        TileManager tileManager = ObjectManager.getTileManager();
-        int cameraX = tileManager != null ? tileManager.getCameraX() : 0;
-        int cameraY = tileManager != null ? tileManager.getCameraY() : 0;
+        int cameraX = getInputCameraX();
+        int cameraY = getInputCameraY();
 
         double toMouseX = (keyController.getMouseX() + cameraX) - x;
         double toMouseY = (keyController.getMouseY() + cameraY) - y;

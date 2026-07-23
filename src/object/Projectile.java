@@ -71,6 +71,10 @@ public class Projectile extends GameObject {
         this.angle = Math.atan2(vy, vx) + Math.PI / 2; // Calcul de l'angle de rotation pour orienter le projectile dans la direction du mouvement  
     }
 
+    public ProjectileType getProjectileType() {
+        return type;
+    }
+
     public void update() {
         if (type == ProjectileType.GRENADE) {
             updateGrenade();
