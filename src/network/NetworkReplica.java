@@ -27,12 +27,22 @@ public final class NetworkReplica extends GameObject {
     private static final BufferedImage ALIEN_IMAGE = load("/assets/aliens/alien.png");
     private static final BufferedImage CIVILIAN_IMAGE = load("/assets/civils/corps.png");
     private static final BufferedImage ROCKET_IMAGE = load("/assets/effets/rocket.png");
+    private static final BufferedImage BLASTER_IMAGE = load("/assets/armes/blaster.png");
+    private static final BufferedImage CARABINE_IMAGE = load("/assets/armes/carabine.png");
+    private static final BufferedImage GLOCK_IMAGE = load("/assets/armes/glock.png");
+    private static final BufferedImage SHOTGUN_IMAGE = load("/assets/armes/shotgun.png");
+    private static final BufferedImage GRENADE_IMAGE = load("/assets/armes/grenade.png");
+    private static final BufferedImage ROCKET_LAUNCHER_IMAGE = load("/assets/armes/rocket_launcher.png");
+    private static final BufferedImage MINIGUN_IMAGE = load("/assets/armes/minigun.png");
+    private static final BufferedImage SHELL_IMAGE = load("/assets/effets/douille.png");
 
     private final byte type;
     private final byte variant;
     private final double facingX;
     private final double facingY;
     private final boolean localPlayer;
+    private final String detail;
+    private final int amount;
 
     public NetworkReplica(WorldSnapshot.Entity entity) {
         super(entity.x, entity.y);
@@ -43,6 +53,8 @@ public final class NetworkReplica extends GameObject {
         facingX = entity.facingX;
         facingY = entity.facingY;
         localPlayer = entity.localPlayer;
+        detail = entity.detail == null ? "" : entity.detail;
+        amount = entity.amount;
     }
 
     @Override
@@ -84,7 +96,34 @@ public final class NetworkReplica extends GameObject {
             g2d.setColor(ring);
             g2d.fillOval((int) x - 14, (int) y - 14, 28, 28);
         }
+        drawCarriedWeapon(g2d);
         g2d.setTransform(old);
+    }
+
+    private void drawCarriedWeapon(Graphics2D g2d) {
+        if (detail.isBlank()) return;
+        if ("Canon Tesla".equalsIgnoreCase(detail) || detail.toLowerCase().contains("tesla")) {
+            g2d.setColor(new Color(92, 220, 255));
+            g2d.fillRoundRect((int) x - 5, (int) y - 20, 10, 31, 5, 5);
+            g2d.setColor(new Color(220, 250, 255));
+            g2d.drawLine((int) x, (int) y - 30, (int) x, (int) y - 16);
+            return;
+        }
+        BufferedImage weapon = switch (detail) {
+            case "Blaster" -> BLASTER_IMAGE;
+            case "Carabine" -> CARABINE_IMAGE;
+            case "Glock" -> GLOCK_IMAGE;
+            case "Shotgun" -> SHOTGUN_IMAGE;
+            case "Grenade" -> GRENADE_IMAGE;
+            case "Lance-roquettes" -> ROCKET_LAUNCHER_IMAGE;
+            case "Minigun" -> MINIGUN_IMAGE;
+            default -> null;
+        };
+        if (weapon != null) {
+            int height = "Grenade".equals(detail) ? 13 : 28;
+            int width = "Minigun".equals(detail) ? 11 : 8;
+            g2d.drawImage(weapon, (int) x - width / 2, (int) y - 25, width, height, null);
+        }
     }
 
     private void drawProjectile(Graphics2D g2d) {
@@ -113,6 +152,7 @@ public final class NetworkReplica extends GameObject {
         g2d.drawRoundRect((int) x - 18, (int) y - 14, 36, 28, 6, 6);
         g2d.setColor(new Color(235, 198, 84));
         for (int i = -1; i <= 1; i++) g2d.fillRoundRect((int) x + i * 8 - 2, (int) y - 3, 4, 11, 3, 3);
+        drawCenteredLabel(g2d, detail, 25, new Color(150, 220, 255));
     }
 
     private void drawDeathMarker(Graphics2D g2d) {
@@ -122,10 +162,26 @@ public final class NetworkReplica extends GameObject {
             case 3 -> new Color(185, 120, 255, 180);
             default -> new Color(180, 185, 190, 170);
         };
+        AffineTransform old = g2d.getTransform();
+        double rotation = ((Double.doubleToLongBits(x * 31.0 + y * 17.0) & 1023L) / 1023.0) * Math.PI * 2.0;
+        g2d.rotate(rotation, x, y);
+        g2d.setColor(new Color(10, 12, 15, 95));
+        g2d.fillOval((int) x - 25, (int) y - 13, 50, 26);
         g2d.setColor(color);
-        g2d.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g2d.drawLine((int) x - 20, (int) y, (int) x + 20, (int) y);
-        g2d.fillOval((int) x - 25, (int) y - 6, 12, 12);
+        g2d.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        if (variant == 3) {
+            Polygon alien = new Polygon(
+                    new int[]{(int) x - 23, (int) x - 8, (int) x + 10, (int) x + 23, (int) x + 8, (int) x - 10},
+                    new int[]{(int) y, (int) y - 9, (int) y - 7, (int) y + 1, (int) y + 9, (int) y + 7}, 6);
+            g2d.fillPolygon(alien);
+        } else {
+            g2d.fillOval((int) x - 22, (int) y - 8, 13, 13);
+            g2d.fillRoundRect((int) x - 10, (int) y - 8, 25, 16, 9, 9);
+            g2d.drawLine((int) x + 10, (int) y - 3, (int) x + 23, (int) y - 9);
+            g2d.drawLine((int) x + 10, (int) y + 3, (int) x + 23, (int) y + 9);
+        }
+        g2d.setTransform(old);
+        if (variant == 1 && amount == 1) drawCenteredLabel(g2d, "E - REANIMER", 35, new Color(125, 245, 170));
     }
 
     private void drawTurret(Graphics2D g2d) {
@@ -140,15 +196,106 @@ public final class NetworkReplica extends GameObject {
     }
 
     private void drawPickup(Graphics2D g2d) {
-        g2d.setColor(new Color(255, 220, 75, 100));
+        Color halo = variant == 1 ? new Color(88, 148, 255, 95)
+                : variant == 3 ? new Color(90, 170, 255, 90) : new Color(255, 220, 75, 100);
+        g2d.setColor(halo);
         g2d.fillOval((int) x - 14, (int) y - 14, 28, 28);
-        g2d.setColor(new Color(235, 240, 250));
-        g2d.fillRoundRect((int) x - 8, (int) y - 5, 16, 10, 4, 4);
+        g2d.setColor(new Color(225, 240, 250));
+        if (variant == 3) {
+            g2d.setColor(new Color(68, 118, 175));
+            g2d.fillRoundRect((int) x - 7, (int) y - 9, 14, 18, 4, 4);
+            g2d.setColor(new Color(175, 230, 255));
+            g2d.drawRoundRect((int) x - 7, (int) y - 9, 14, 18, 4, 4);
+        } else if (variant == 2) {
+            AffineTransform old = g2d.getTransform();
+            g2d.rotate(-Math.PI / 2, x, y);
+            drawPickupWeapon(g2d);
+            g2d.setTransform(old);
+        } else {
+            g2d.setColor(new Color(40, 52, 66));
+            g2d.fillRoundRect((int) x - 10, (int) y - 7, 20, 14, 4, 4);
+            g2d.setColor(new Color(212, 228, 245));
+            g2d.drawRoundRect((int) x - 10, (int) y - 7, 20, 14, 4, 4);
+            for (int offset = -4; offset <= 4; offset += 4) {
+                g2d.drawLine((int) x + offset, (int) y - 4, (int) x + offset, (int) y + 4);
+            }
+        }
+        String label = variant == 1 ? "+" + amount + " " + detail : detail;
+        drawCenteredLabel(g2d, label, 22, Color.WHITE);
+    }
+
+    private void drawPickupWeapon(Graphics2D g2d) {
+        BufferedImage weapon = switch (detail) {
+            case "Blaster" -> BLASTER_IMAGE;
+            case "Carabine" -> CARABINE_IMAGE;
+            case "Glock" -> GLOCK_IMAGE;
+            case "Shotgun" -> SHOTGUN_IMAGE;
+            case "Grenade" -> GRENADE_IMAGE;
+            case "Lance-roquettes" -> ROCKET_LAUNCHER_IMAGE;
+            case "Minigun" -> MINIGUN_IMAGE;
+            default -> null;
+        };
+        if (weapon != null) g2d.drawImage(weapon, (int) x - 4, (int) y - 10, 8, 20, null);
+        else {
+            g2d.setColor(new Color(92, 220, 255));
+            g2d.fillRoundRect((int) x - 4, (int) y - 11, 8, 22, 4, 4);
+        }
+    }
+
+    private void drawCenteredLabel(Graphics2D g2d, String label, int yOffset, Color color) {
+        if (label == null || label.isBlank()) return;
+        g2d.setColor(color);
+        g2d.setFont(g2d.getFont().deriveFont(Font.BOLD, 10f));
+        FontMetrics metrics = g2d.getFontMetrics();
+        g2d.drawString(label, (int) x - metrics.stringWidth(label) / 2, (int) y + yOffset);
     }
 
     private void drawEffect(Graphics2D g2d) {
-        g2d.setColor(new Color(255, 185, 95, 170));
-        g2d.fillOval((int) x - 7, (int) y - 7, 14, 14);
+        switch (variant) {
+            case 1 -> {
+                g2d.setColor(new Color(255, 185, 95, 210));
+                g2d.setStroke(new BasicStroke(2f));
+                for (int i = 0; i < 6; i++) {
+                    double angle = i * Math.PI / 3.0;
+                    g2d.drawLine((int) x, (int) y,
+                            (int) Math.round(x + Math.cos(angle) * 13),
+                            (int) Math.round(y + Math.sin(angle) * 13));
+                }
+            }
+            case 2 -> {
+                g2d.setColor(new Color(255, 150, 75, 105));
+                g2d.fillOval((int) x - 31, (int) y - 31, 62, 62);
+                g2d.setColor(new Color(90, 90, 96, 135));
+                g2d.fillOval((int) x - 22, (int) y - 18, 44, 44);
+            }
+            case 3 -> {
+                g2d.setColor(new Color(255, 220, 140, 175));
+                g2d.setStroke(new BasicStroke(3f));
+                g2d.drawOval((int) x - 35, (int) y - 35, 70, 70);
+            }
+            case 4 -> {
+                g2d.setColor(new Color(100, 225, 255, 210));
+                g2d.setStroke(new BasicStroke(3f));
+                g2d.drawLine((int) x - 18, (int) y + 8, (int) x - 5, (int) y - 9);
+                g2d.drawLine((int) x - 5, (int) y - 9, (int) x + 7, (int) y + 7);
+                g2d.drawLine((int) x + 7, (int) y + 7, (int) x + 22, (int) y - 12);
+            }
+            case 5 -> {
+                g2d.setColor(new Color(80, 240, 145, 95));
+                g2d.setStroke(new BasicStroke(16f));
+                g2d.drawLine((int) x, (int) y - 120, (int) x, (int) y);
+                g2d.setColor(new Color(135, 255, 190, 210));
+                g2d.setStroke(new BasicStroke(2f));
+                g2d.drawOval((int) x - 22, (int) y - 22, 44, 44);
+            }
+            case 6 -> {
+                if (SHELL_IMAGE != null) g2d.drawImage(SHELL_IMAGE, (int) x - 4, (int) y - 2, 8, 4, null);
+            }
+            default -> {
+                g2d.setColor(new Color(255, 185, 95, 170));
+                g2d.fillOval((int) x - 7, (int) y - 7, 14, 14);
+            }
+        }
     }
 
     private static BufferedImage load(String path) {

@@ -1,5 +1,6 @@
 package network;
 
+import main.Utils;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -17,6 +18,8 @@ public final class WorldSnapshot {
         public double facingX;
         public double facingY;
         public boolean localPlayer;
+        public String detail = "";
+        public int amount;
     }
 
     public int mapType;
@@ -34,6 +37,7 @@ public final class WorldSnapshot {
     public int maxArmor;
     public boolean reloading;
     public double reloadProgress;
+    public long[] soundCounters = new long[Utils.SOUND_COUNT];
     public final List<Entity> entities = new ArrayList<>();
 
     public void write(DataOutputStream output) throws IOException {
@@ -52,6 +56,7 @@ public final class WorldSnapshot {
         output.writeInt(maxArmor);
         output.writeBoolean(reloading);
         output.writeDouble(reloadProgress);
+        for (int i = 0; i < Utils.SOUND_COUNT; i++) output.writeLong(soundCounters[i]);
         output.writeInt(entities.size());
         for (Entity entity : entities) {
             output.writeByte(entity.type);
@@ -63,6 +68,8 @@ public final class WorldSnapshot {
             output.writeDouble(entity.facingX);
             output.writeDouble(entity.facingY);
             output.writeBoolean(entity.localPlayer);
+            output.writeUTF(entity.detail);
+            output.writeInt(entity.amount);
         }
     }
 
@@ -83,6 +90,7 @@ public final class WorldSnapshot {
         snapshot.maxArmor = input.readInt();
         snapshot.reloading = input.readBoolean();
         snapshot.reloadProgress = input.readDouble();
+        for (int i = 0; i < Utils.SOUND_COUNT; i++) snapshot.soundCounters[i] = input.readLong();
         int count = input.readInt();
         if (count < 0 || count > 10_000) throw new IOException("instantane invalide");
         for (int i = 0; i < count; i++) {
@@ -96,6 +104,8 @@ public final class WorldSnapshot {
             entity.facingX = input.readDouble();
             entity.facingY = input.readDouble();
             entity.localPlayer = input.readBoolean();
+            entity.detail = input.readUTF();
+            entity.amount = input.readInt();
             snapshot.entities.add(entity);
         }
         return snapshot;

@@ -569,4 +569,8 @@ public class Soldat extends Homme {
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
         
     }
+
+    public Weapon getCarriedWeapon() {
+        return carriedWeapon;
+    }
 }

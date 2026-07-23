@@ -122,6 +122,8 @@ public class GamePanel extends JPanel implements Runnable {
     private volatile WorldSnapshot networkSnapshot;
     private volatile boolean networkReplicaView;
     private volatile String networkConnectionStatus = "Connexion a l'hote...";
+    private final long[] networkSoundCounters = new long[Utils.SOUND_COUNT];
+    private boolean networkSoundCountersInitialized;
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
     private String gameOverTitle = "VOUS ETES MORT";
@@ -194,6 +196,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     public void applyNetworkSnapshot(WorldSnapshot snapshot) {
         if (snapshot == null) return;
+        applyNetworkSounds(snapshot);
         networkSnapshot = snapshot;
         MapType[] maps = MapType.values();
         if (snapshot.mapType >= 0 && snapshot.mapType < maps.length) {
@@ -216,12 +219,28 @@ public class GamePanel extends JPanel implements Runnable {
         repaint();
     }
 
+    private void applyNetworkSounds(WorldSnapshot snapshot) {
+        if (!networkSoundCountersInitialized) {
+            System.arraycopy(snapshot.soundCounters, 0, networkSoundCounters, 0, Utils.SOUND_COUNT);
+            networkSoundCountersInitialized = true;
+            return;
+        }
+        for (int sound = 0; sound < Utils.SOUND_COUNT; sound++) {
+            long delta = snapshot.soundCounters[sound] - networkSoundCounters[sound];
+            for (int repeat = 0; repeat < Math.min(3L, Math.max(0L, delta)); repeat++) {
+                Utils.playReplicatedSound(sound);
+            }
+            networkSoundCounters[sound] = snapshot.soundCounters[sound];
+        }
+    }
+
     public WorldSnapshot createSnapshotForRemote() {
         WorldSnapshot snapshot = new WorldSnapshot();
         snapshot.mapType = tileManager.getCurrentMapType().ordinal();
         snapshot.gameMode = GameMode.current.ordinal();
         snapshot.screenState = screenState.ordinal();
         snapshot.score = score;
+        snapshot.soundCounters = Utils.getSoundCounters();
         Protagonist remote = remoteProtagonist;
         if (remote != null) {
             snapshot.playerX = remote.x;
@@ -256,13 +275,16 @@ public class GamePanel extends JPanel implements Runnable {
             entity.facingX = player.getFacingX();
             entity.facingY = player.getFacingY();
             entity.localPlayer = player == remote;
-        } else if (object instanceof Soldat) {
+            if (player.getCurrentWeapon() != null) entity.detail = player.getCurrentWeapon().getName();
+        } else if (object instanceof Soldat soldier) {
             entity.type = NetworkReplica.SOLDIER;
+            entity.detail = soldier.getCarriedWeapon().getName();
         } else if (object instanceof Ennemi enemy) {
             entity.type = NetworkReplica.ENEMY;
             entity.variant = (byte) (enemy.getArchetype() == EnemyArchetype.ROQUETTE ? 2 : 1);
             entity.facingX = enemy.getFacingX();
             entity.facingY = enemy.getFacingY();
+            entity.detail = enemy.getCarriedWeapon().getName();
         } else if (object instanceof Alien) {
             entity.type = NetworkReplica.ALIEN;
         } else if (object instanceof Homme) {
@@ -272,19 +294,50 @@ public class GamePanel extends JPanel implements Runnable {
             entity.variant = (byte) (projectile.getProjectileType().ordinal() + 1);
         } else if (object instanceof AmmoDepot) {
             entity.type = NetworkReplica.AMMO_DEPOT;
+            entity.detail = "DEPOT MUNITIONS";
         } else if (object instanceof DeathMarker marker) {
             entity.type = NetworkReplica.DEATH_MARKER;
             entity.variant = (byte) marker.getNetworkVariant();
+            if (entity.variant == 1 && remote != null) {
+                double dx = remote.x - marker.x;
+                double dy = remote.y - marker.y;
+                entity.amount = dx * dx + dy * dy <= 68.0 * 68.0 ? 1 : 0;
+            }
         } else if (object instanceof DesertTurret turret) {
             entity.type = NetworkReplica.TURRET;
             entity.facingX = turret.getFacingX();
             entity.facingY = turret.getFacingY();
-        } else if (object instanceof DroppedAmmo || object instanceof DroppedArmor || object instanceof DroppedWeapon) {
+        } else if (object instanceof DroppedAmmo ammo) {
             entity.type = NetworkReplica.PICKUP;
-        } else if (object instanceof ImpactSpark || object instanceof RocketBlastCloud
-                || object instanceof Shockwave || object instanceof TeslaArc
-                || object instanceof AlienTeleport || object instanceof Douille) {
+            entity.variant = 1;
+            entity.detail = ammo.getWeapon().getName();
+            entity.amount = ammo.getReserveAmmo();
+        } else if (object instanceof DroppedWeapon weapon) {
+            entity.type = NetworkReplica.PICKUP;
+            entity.variant = 2;
+            entity.detail = weapon.getWeapon().getName();
+        } else if (object instanceof DroppedArmor) {
+            entity.type = NetworkReplica.PICKUP;
+            entity.variant = 3;
+            entity.detail = "Gilet";
+        } else if (object instanceof ImpactSpark) {
             entity.type = NetworkReplica.EFFECT;
+            entity.variant = 1;
+        } else if (object instanceof RocketBlastCloud) {
+            entity.type = NetworkReplica.EFFECT;
+            entity.variant = 2;
+        } else if (object instanceof Shockwave) {
+            entity.type = NetworkReplica.EFFECT;
+            entity.variant = 3;
+        } else if (object instanceof TeslaArc) {
+            entity.type = NetworkReplica.EFFECT;
+            entity.variant = 4;
+        } else if (object instanceof AlienTeleport) {
+            entity.type = NetworkReplica.EFFECT;
+            entity.variant = 5;
+        } else if (object instanceof Douille) {
+            entity.type = NetworkReplica.EFFECT;
+            entity.variant = 6;
         } else {
             return null;
         }

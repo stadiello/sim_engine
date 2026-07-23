@@ -6,11 +6,21 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicLongArray;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 
 public class Utils {
+	public static final int SOUND_ELECTRIC = 0;
+	public static final int SOUND_LASER = 1;
+	public static final int SOUND_SMG = 2;
+	public static final int SOUND_PISTOL = 3;
+	public static final int SOUND_GRENADE = 4;
+	public static final int SOUND_SHOTGUN = 5;
+	public static final int SOUND_RELOAD = 6;
+	public static final int SOUND_COUNT = 7;
+	private static final AtomicLongArray SOUND_COUNTERS = new AtomicLongArray(SOUND_COUNT);
 
 	private static final SoundPool ELECTRIC_POOL = new SoundPool("/sound/electric.wav", 4, 8_000_000L);
 	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4, 8_000_000L);
@@ -28,31 +38,56 @@ public class Utils {
 	private Utils() {}
 
 	public static void playElectricSound() {
-		dispatch(ELECTRIC_POOL);
+		playAndCount(SOUND_ELECTRIC, ELECTRIC_POOL);
 	}
 
 	public static void playLaserSound() {
-		dispatch(LASER_POOL);
+		playAndCount(SOUND_LASER, LASER_POOL);
 	}
 
 	public static void playSmgSound() {
-		dispatch(SMG_POOL);
+		playAndCount(SOUND_SMG, SMG_POOL);
 	}
 
 	public static void playPistolSound() {
-		dispatch(PISTOL_POOL);
+		playAndCount(SOUND_PISTOL, PISTOL_POOL);
 	}
 
 	public static void playGrenadeSound() {
-		dispatch(GRENADE_POOL);
+		playAndCount(SOUND_GRENADE, GRENADE_POOL);
 	}
 
 	public static void playShotgunSound() {
-		dispatch(SHOTGUN_POOL);
+		playAndCount(SOUND_SHOTGUN, SHOTGUN_POOL);
 	}
 
 	public static void playReloadSound() {
-		dispatch(RELOAD_POOL);
+		playAndCount(SOUND_RELOAD, RELOAD_POOL);
+	}
+
+	public static long[] getSoundCounters() {
+		long[] counters = new long[SOUND_COUNT];
+		for (int i = 0; i < SOUND_COUNT; i++) counters[i] = SOUND_COUNTERS.get(i);
+		return counters;
+	}
+
+	public static void playReplicatedSound(int sound) {
+		SoundPool pool = switch (sound) {
+			case SOUND_ELECTRIC -> ELECTRIC_POOL;
+			case SOUND_LASER -> LASER_POOL;
+			case SOUND_SMG -> SMG_POOL;
+			case SOUND_PISTOL -> PISTOL_POOL;
+			case SOUND_GRENADE -> GRENADE_POOL;
+			case SOUND_SHOTGUN -> SHOTGUN_POOL;
+			case SOUND_RELOAD -> RELOAD_POOL;
+			default -> null;
+		};
+		if (pool != null) dispatch(pool);
+	}
+
+	private static void playAndCount(int sound, SoundPool pool) {
+		SOUND_COUNTERS.incrementAndGet(sound);
+		dispatch(pool);
 	}
 
 	private static void dispatch(SoundPool pool) {

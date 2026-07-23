@@ -17,6 +17,10 @@ public class DroppedWeapon extends GameObject {
         this.vy = 0;
     }
 
+    public Weapon getWeapon() {
+        return weapon;
+    }
+
     @Override
     public void update() {
         for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {

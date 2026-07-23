@@ -22,6 +22,14 @@ public class DroppedAmmo extends GameObject {
         this.reserveAmmo = Math.max(1, reserveAmmo);
     }
 
+    public Weapon getWeapon() {
+        return weapon;
+    }
+
+    public int getReserveAmmo() {
+        return reserveAmmo;
+    }
+
     @Override
     public void update() {
         for (GameObject obj : new java.util.ArrayList<>(ObjectManager.list)) {

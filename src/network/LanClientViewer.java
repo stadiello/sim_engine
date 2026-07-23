@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 
 public final class LanClientViewer extends GamePanel implements Runnable {
-    private static final String MAGIC = "SIM_ENGINE_LAN_2";
+    private static final String MAGIC = "SIM_ENGINE_LAN_3";
     private final String host;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean(true);
