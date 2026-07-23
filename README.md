@@ -28,6 +28,42 @@ Ce script :
 - compile `src/main/GamePanel.java`
 - lance `main.GamePanel`
 
+Au demarrage, choisis :
+
+- `Solo` pour jouer normalement ;
+- `Heberger en LAN` sur l'ordinateur qui simulera la partie ;
+- `Rejoindre` sur le second ordinateur.
+
+## Mode coop LAN (2 joueurs)
+
+Les deux ordinateurs doivent utiliser la meme version du jeu et etre connectes au
+meme reseau local.
+
+1. Sur l'ordinateur 1, lance le jeu et choisis `Heberger en LAN`.
+2. L'adresse a communiquer au joueur 2 est affichee en haut de l'ecran, par
+   exemple `192.168.1.20:28765`.
+3. Sur l'ordinateur 2, lance le jeu, choisis `Rejoindre`, puis saisis uniquement
+   l'adresse IP de l'hote, par exemple `192.168.1.20`.
+4. L'hote choisit ensuite la carte et le mode de jeu.
+
+Le port TCP utilise par defaut est `28765`. Le pare-feu de l'ordinateur hote peut
+demander d'autoriser les connexions entrantes pour Java ou SimEngine.
+
+Cette premiere version est autoritaire : l'hote execute la simulation et diffuse
+l'image au joueur 2, qui lui envoie ses commandes. Les deux joueurs partagent donc
+la meme camera et doivent rester relativement proches. Les mouvements, la visee,
+les tirs, le rechargement, le changement d'arme et les interactions de mission du
+joueur 2 sont transmis a l'hote.
+
+Il est aussi possible de choisir directement le role en ligne de commande apres
+compilation :
+
+```bash
+java -cp out main.GamePanel --host
+java -cp out main.GamePanel --join 192.168.1.20
+java -cp out main.GamePanel --solo
+```
+
 ## Generer un package de release
 
 ```bash

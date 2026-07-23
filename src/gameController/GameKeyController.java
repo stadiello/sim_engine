@@ -9,7 +9,7 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class GameKeyController implements KeyEventDispatcher, MouseMotionListener, MouseListener, MouseWheelListener {
+public class GameKeyController implements PlayerInput, KeyEventDispatcher, MouseMotionListener, MouseListener, MouseWheelListener {
     
     private boolean up, down, left, right;
     private boolean sprint;

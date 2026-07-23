@@ -9,6 +9,9 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 
 import gameController.GameKeyController;
+import gameController.RemotePlayerInput;
+import network.LanClientViewer;
+import network.LanHost;
 import object.GameObject;
 import object.ai.AiTuning;
 import object.ai.TacticalMovement;
@@ -83,6 +86,9 @@ public class GamePanel extends JPanel implements Runnable {
 
     TileManager tileManager = new TileManager(this);
     private final GameKeyController keyController = new GameKeyController();
+    private volatile RemotePlayerInput remotePlayerInput;
+    private volatile Protagonist remoteProtagonist;
+    private volatile LanHost lanHost;
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
     private String gameOverTitle = "VOUS ETES MORT";
@@ -126,6 +132,38 @@ public class GamePanel extends JPanel implements Runnable {
         updateCamera();
     }
 
+    public void startLanHost(int port) {
+        if (lanHost != null) return;
+        lanHost = new LanHost(this, port);
+        lanHost.start();
+    }
+
+    public void onRemotePlayerConnected(RemotePlayerInput input) {
+        remotePlayerInput = input;
+        addRemoteProtagonistIfNeeded();
+    }
+
+    public void onRemotePlayerDisconnected() {
+        Protagonist disconnected = remoteProtagonist;
+        remoteProtagonist = null;
+        remotePlayerInput = null;
+        if (disconnected != null) ObjectManager.list.remove(disconnected);
+    }
+
+    private void addRemoteProtagonistIfNeeded() {
+        if (remotePlayerInput == null || remoteProtagonist != null) return;
+        Protagonist primary = ObjectManager.getProtagonist();
+        double x = primary != null ? primary.x + tileSize : tileSize * 7.0;
+        double y = primary != null ? primary.y : tileSize * 6.0;
+        if (!isSpawnAreaFree(x, y, ENTITY_RADIUS)) {
+            double[] spawn = getFreeSpawnPosition();
+            x = spawn[0];
+            y = spawn[1];
+        }
+        remoteProtagonist = new Protagonist(x, y, remotePlayerInput, false);
+        ObjectManager.list.add(remoteProtagonist);
+    }
+
     private void initializeWorld() {
         ObjectManager.list.clear();
         score = 0;
@@ -155,6 +193,8 @@ public class GamePanel extends JPanel implements Runnable {
         double protagonistSpawnX = protagonistSpawn[0];
         double protagonistSpawnY = protagonistSpawn[1];
         ObjectManager.list.add(new Protagonist(protagonistSpawn[0], protagonistSpawn[1], keyController));
+        remoteProtagonist = null;
+        addRemoteProtagonistIfNeeded();
 
         // Garde les soldats alliés près du protagoniste dans la même zone sécurisée.
         for (int i = 0; i < soldatsToSpawn; i++) {
@@ -361,13 +401,19 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         boolean interactTriggered = keyController.consumeInteractTriggered();
+        Protagonist interactionPlayer = protagonist;
+        RemotePlayerInput remoteInput = remotePlayerInput;
+        if (remoteInput != null && remoteInput.consumeInteractTriggered() && remoteProtagonist != null) {
+            interactTriggered = true;
+            interactionPlayer = remoteProtagonist;
+        }
 
         switch (activeMissionType) {
-            case RESCUE_HOSTAGES -> updateRescueMission(protagonist, interactTriggered);
+            case RESCUE_HOSTAGES -> updateRescueMission(interactionPlayer, interactTriggered);
             case DEFEND_POSITION -> updateDefendMission(protagonist);
             case SECURE_ZONE -> updateSecureMission(protagonist);
             case INFILTRATE -> updateInfiltrationMission(protagonist);
-            case DESTROY_VEHICLE -> updateSabotageMission(protagonist, interactTriggered);
+            case DESTROY_VEHICLE -> updateSabotageMission(interactionPlayer, interactTriggered);
         }
     }
 
@@ -728,14 +774,53 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     public static void main(String[] args) {
-        JFrame frame = new JFrame("Simulation");
+        SwingUtilities.invokeLater(() -> launch(args));
+    }
+
+    private static void launch(String[] args) {
+        String action = args.length > 0 ? args[0] : "";
+        if (action.isEmpty()) {
+            Object[] choices = {"Solo", "Heberger en LAN", "Rejoindre"};
+            int selected = JOptionPane.showOptionDialog(
+                    null, "Comment veux-tu jouer ?", "SIM ENGINE",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, choices, choices[0]
+            );
+            if (selected < 0) return;
+            action = selected == 1 ? "--host" : selected == 2 ? "--join" : "--solo";
+        }
+
+        if ("--join".equals(action)) {
+            String defaultHost = args.length > 1 ? args[1] : "192.168.1.2";
+            String host = args.length > 1 ? defaultHost : JOptionPane.showInputDialog(
+                    null, "Adresse IP de l'hote :", defaultHost
+            );
+            if (host == null || host.isBlank()) return;
+            launchClient(host.trim());
+            return;
+        }
+
+        JFrame frame = new JFrame("--host".equals(action) ? "SIM ENGINE - Hote LAN" : "Simulation");
         GamePanel gamePanel = new GamePanel();
         frame.add(gamePanel);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 600);
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(gamePanel.keyController);
+        frame.setLocationRelativeTo(null);
         frame.setVisible(true);
-        new Thread(gamePanel).start();
+        if ("--host".equals(action)) gamePanel.startLanHost(LanHost.DEFAULT_PORT);
+        new Thread(gamePanel, "game-loop").start();
+    }
+
+    private static void launchClient(String host) {
+        JFrame frame = new JFrame("SIM ENGINE - Joueur 2");
+        LanClientViewer viewer = new LanClientViewer(host, LanHost.DEFAULT_PORT);
+        frame.add(viewer);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(viewer.getControls());
+        frame.setVisible(true);
+        new Thread(viewer, "lan-client").start();
     }
 
     public void run() {
@@ -1208,7 +1293,14 @@ public class GamePanel extends JPanel implements Runnable {
 
         int viewWidth = getViewWidth();
         int viewHeight = getViewHeight();
-        tileManager.centerCameraOn(protagonist.x, protagonist.y, viewWidth, viewHeight);
+        double cameraTargetX = protagonist.x;
+        double cameraTargetY = protagonist.y;
+        Protagonist remote = remoteProtagonist;
+        if (remote != null) {
+            cameraTargetX = (cameraTargetX + remote.x) / 2.0;
+            cameraTargetY = (cameraTargetY + remote.y) / 2.0;
+        }
+        tileManager.centerCameraOn(cameraTargetX, cameraTargetY, viewWidth, viewHeight);
     }
 
     private int getViewWidth() {
@@ -1655,6 +1747,19 @@ public class GamePanel extends JPanel implements Runnable {
         Graphics2D g2d = (Graphics2D) g;
         drawTopStatusBar(g2d);
         drawBottomRightHud(g2d);
+        if (lanHost != null) {
+            Font oldFont = g2d.getFont();
+            g2d.setFont(oldFont.deriveFont(Font.BOLD, 13f));
+            String status = lanHost.getStatus();
+            FontMetrics metrics = g2d.getFontMetrics();
+            int width = metrics.stringWidth(status) + 22;
+            int x = (getViewWidth() - width) / 2;
+            g2d.setColor(new Color(8, 14, 24, 205));
+            g2d.fillRoundRect(x, 10, width, 28, 12, 12);
+            g2d.setColor(remoteProtagonist != null ? new Color(120, 255, 160) : new Color(255, 214, 120));
+            g2d.drawString(status, x + 11, 29);
+            g2d.setFont(oldFont);
+        }
     }
 
     private void drawArcadeOverlay(Graphics2D g2d) {
@@ -1916,6 +2021,19 @@ public class GamePanel extends JPanel implements Runnable {
         } else if (screenState == ScreenState.OPTIONS) {
             drawOptions(g2d);
         }
+    }
+
+    public BufferedImage captureFrame() {
+        int width = Math.max(1, getViewWidth());
+        int height = Math.max(1, getViewHeight());
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            paint(graphics);
+        } finally {
+            graphics.dispose();
+        }
+        return image;
     }
 
     public void paintScore(Graphics g, int scoreHit) {

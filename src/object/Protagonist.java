@@ -27,7 +27,8 @@ public class Protagonist extends Homme{
     private int shootCooldown = 0;
     private int reloadTimer = 0;
     private int timer = 0;
-    private final GameKeyController keyController;
+    private final PlayerInput keyController;
+    private final boolean primaryPlayer;
     private double facingX;
     private double facingY;
     private int selectedWeaponIndex = 0;
@@ -41,9 +42,14 @@ public class Protagonist extends Homme{
         }
     }
     
-    public Protagonist(double x, double y, GameKeyController keyController) {
+    public Protagonist(double x, double y, PlayerInput keyController) {
+        this(x, y, keyController, true);
+    }
+
+    public Protagonist(double x, double y, PlayerInput keyController, boolean primaryPlayer) {
         super(x, y);
         this.keyController = keyController;
+        this.primaryPlayer = primaryPlayer;
         this.loadout = new ArrayList<>();
         for (Weapon weapon : getInitialLoadout()) {
             loadout.add(weapon);
@@ -52,6 +58,10 @@ public class Protagonist extends Homme{
         vy = 0;
         facingX = 0;
         facingY = -1;
+    }
+
+    public boolean isPrimaryPlayer() {
+        return primaryPlayer;
     }
 
     private static Weapon[] getInitialLoadout() {
@@ -312,6 +322,10 @@ public class Protagonist extends Homme{
 
         double angle = Math.atan2(facingY, facingX) + Math.PI / 2;
         var old = g2d.getTransform(); // Sauvegarde de la transformation actuelle
+
+        g2d.setColor(primaryPlayer ? new Color(90, 180, 255, 210) : new Color(105, 255, 145, 220));
+        g2d.setStroke(new BasicStroke(3f));
+        g2d.drawOval((int) Math.round(x) - 21, (int) Math.round(y) - 20, 42, 42);
 
         g2d.rotate(angle, x, y);
 

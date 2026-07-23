@@ -453,7 +453,9 @@ public class ObjectManager {
             livingHumans.add(homme);
 
             if (obj instanceof Protagonist newProtagonist) {
-                protagonist = newProtagonist;
+                if (protagonist == null || newProtagonist.isPrimaryPlayer()) {
+                    protagonist = newProtagonist;
+                }
                 alliedTargets.add(homme);
             } else if (obj instanceof Soldat) {
                 alliedTargets.add(homme);
@@ -476,6 +478,12 @@ public class ObjectManager {
 
             if (obj instanceof Protagonist && protagonist == obj) {
                 protagonist = null;
+                for (GameObject candidate : list) {
+                    if (candidate instanceof Protagonist remaining && !pendingRemovalSet.contains(remaining)) {
+                        protagonist = remaining;
+                        if (remaining.isPrimaryPlayer()) break;
+                    }
+                }
             }
 
             alliedTargets.remove(homme);

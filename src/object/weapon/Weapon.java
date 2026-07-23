@@ -117,25 +117,25 @@ public final class Weapon {
             FireSound.GRENADE,
             1,
             2,
-            90);
+            1);
 
-            private static final Weapon ROCKET_LAUNCHER = new Weapon(
-                "Lance-roquettes",
-                "/assets/armes/rocket_launcher.png",
-                Projectile.ProjectileType.ROCKET,
-                95,
-                8.8,
-                14,
-                40,
-                8,
-                -28,
-                10,
-                false,
-                false,
-                FireSound.GRENADE,
-                1,
-                5,
-                115);
+    private static final Weapon ROCKET_LAUNCHER = new Weapon(
+        "Lance-roquettes",
+        "/assets/armes/rocket_launcher.png",
+        Projectile.ProjectileType.ROCKET,
+        95,
+        8.8,
+        14,
+        40,
+        8,
+        -28,
+        10,
+        false,
+        false,
+        FireSound.GRENADE,
+        1,
+        5,
+        115);
 
     private static final Weapon MINIGUN = new Weapon(
             "Minigun",
@@ -184,7 +184,7 @@ public final class Weapon {
     }
 
     public static Weapon[] protagonistLoadout() {
-        return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade()};
+        return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade(), minigun(), rocketLauncher()};
     }
 
     public static Weapon[] storyLoadout() {
