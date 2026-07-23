@@ -19,6 +19,7 @@ import object.Alien;
 import object.AlienTeleport;
 import object.AmmoDepot;
 import object.DesertTurret;
+import object.DeathMarker;
 import object.Ennemi;
 import object.Ennemi.EnemyArchetype;
 import object.Homme;
@@ -61,6 +62,22 @@ public class GamePanel extends JPanel implements Runnable {
         VICTORY
     }
 
+    private enum DifficultyProfile {
+        EASY("Facile"),
+        NORMAL("Normal"),
+        CUSTOM("Personnaliser");
+
+        private final String label;
+
+        DifficultyProfile(String label) {
+            this.label = label;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
     private int nombreCivil = 5;
     private int nombreEnnemi = 10;
     private int nombreAlien = 5;
@@ -76,6 +93,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int AI_OPTION_ROW_GAP = 26;
     private static final int AI_OPTION_COUNT = 12;
     private static final int MENU_MAP_CARD_GAP = 26;
+    private static final int DIFFICULTY_BUTTON_GAP = 14;
     private static final float NIGHT_DARKNESS_ALPHA = 0.86f;
     private static final double PLAYER_FLASHLIGHT_RANGE = 320;
     private static final double PLAYER_FLASHLIGHT_HALF_ANGLE = Math.toRadians(35);
@@ -106,6 +124,7 @@ public class GamePanel extends JPanel implements Runnable {
     private static boolean unlimitedAmmoEnabled = false;
     private static boolean fireCameraFeedbackEnabled = true;
     private static boolean deathMarkersEnabled = true;
+    private DifficultyProfile currentDifficulty = DifficultyProfile.NORMAL;
     private int missionRotationIndex = 0;
     private MissionType activeMissionType;
     private String activeMissionTitle = "";
@@ -187,6 +206,11 @@ public class GamePanel extends JPanel implements Runnable {
             soldatsToSpawn = Math.max(1, nombreSoldat);
         }
 
+        if (isEasyDifficulty()) {
+            civilsToSpawn = Math.max(civilsToSpawn, nombreCivil + 1);
+            soldatsToSpawn = Math.min(10, soldatsToSpawn + 1);
+        }
+
         // Cree une petite population initiale.
         for (int i = 0; i < civilsToSpawn; i++) {
             double[] spawn = getFreeSpawnPosition();
@@ -212,7 +236,7 @@ public class GamePanel extends JPanel implements Runnable {
         spawnAmmoDepots();
         spawnMapSpecificObjects();
 
-        int aliensToSpawn = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien - 1) : nombreAlien;
+        int aliensToSpawn = getAdjustedAlienCount(GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien - 1) : nombreAlien);
         for (int i = 0; i < aliensToSpawn; i++) {
             double[] spawn = getFreeSpawnPositionFarFrom(
                     protagonistSpawnX,
@@ -222,7 +246,7 @@ public class GamePanel extends JPanel implements Runnable {
             ObjectManager.list.add(new AlienTeleport(spawn[0], spawn[1]));
         }
 
-        int enemyCount = GameMode.current == GameMode.ARCADE ? Math.max(8, nombreEnnemi - 1) : nombreEnnemi;
+        int enemyCount = getAdjustedEnemyCount(GameMode.current == GameMode.ARCADE ? Math.max(8, nombreEnnemi - 1) : nombreEnnemi);
         int[][] enemySpawnZones = buildEnemySpawnZones();
         for (int i = 0; i < enemyCount; i++) {
             int[] zone = enemySpawnZones[i % enemySpawnZones.length];
@@ -262,6 +286,16 @@ public class GamePanel extends JPanel implements Runnable {
             double[] position = getFreeSpawnPositionInZone(zone[0], zone[1], zone[2], zone[3]);
             ObjectManager.list.add(new AmmoDepot(position[0], position[1]));
         }
+
+        if (isEasyDifficulty()) {
+            double[] bonusDepot = getFreeSpawnPositionInZone(
+                    Math.max(2, centerCol - 5),
+                    Math.min(maxCol, centerCol + 5),
+                    Math.max(2, centerRow - 5),
+                    Math.min(maxRow, centerRow + 5)
+            );
+            ObjectManager.list.add(new AmmoDepot(bonusDepot[0], bonusDepot[1]));
+        }
     }
 
     private void spawnMapSpecificObjects() {
@@ -300,6 +334,17 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private EnemyArchetype chooseEnemyArchetype(int index, int total) {
+        if (isEasyDifficulty()) {
+            double ratio = total > 1 ? index / (double) (total - 1) : 0.0;
+            if (ratio < 0.72) {
+                return EnemyArchetype.STANDARD;
+            }
+            if (ratio < 0.94) {
+                return EnemyArchetype.FLANQUEUR;
+            }
+            return EnemyArchetype.ASSAUT;
+        }
+
         if (total <= 2) {
             return EnemyArchetype.STANDARD;
         }
@@ -504,7 +549,9 @@ public class GamePanel extends JPanel implements Runnable {
                 EnemyArchetype.FLANQUEUR
         };
 
-        for (int i = 0; i < guards.length; i++) {
+        int guardCount = isEasyDifficulty() ? 2 : guards.length;
+
+        for (int i = 0; i < guardCount; i++) {
             double[] spawn = getFreeSpawnPositionInZone(outerStartCol, outerEndCol, outerStartRow, outerEndRow);
             ObjectManager.list.add(new Ennemi(spawn[0], spawn[1], guards[i]));
         }
@@ -900,6 +947,7 @@ public class GamePanel extends JPanel implements Runnable {
             Protagonist protagonist = ObjectManager.getProtagonist();
             Protagonist interactionPlayer = consumeInteractionPlayer(protagonist);
             boolean interactionUsedByTurret = tryToggleDesertTurret(interactionPlayer);
+            boolean interactionUsedByRevive = !interactionUsedByTurret && tryReviveAlly(interactionPlayer);
             applySoldierMoveCommand();
             ObjectManager.updateAll();
             maintainAlienPresence();
@@ -914,7 +962,7 @@ public class GamePanel extends JPanel implements Runnable {
 
             if (GameMode.current == GameMode.MISSION) {
                 updateMissionMode(protagonist, interactionPlayer,
-                        interactionPlayer != null && !interactionUsedByTurret);
+                        interactionPlayer != null && !interactionUsedByTurret && !interactionUsedByRevive);
                 if (screenState != ScreenState.PLAYING) {
                     return;
                 }
@@ -962,6 +1010,16 @@ public class GamePanel extends JPanel implements Runnable {
         return false;
     }
 
+    private boolean tryReviveAlly(Protagonist player) {
+        if (player == null) return false;
+        for (GameObject object : new ArrayList<>(ObjectManager.list)) {
+            if (object instanceof DeathMarker marker && marker.tryRevive(player)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void maintainAlienPresence() {
         if (alienRespawnCooldownFrames > 0) {
             alienRespawnCooldownFrames--;
@@ -969,7 +1027,8 @@ public class GamePanel extends JPanel implements Runnable {
         }
 
         int aliveAliens = ObjectManager.getUiCounts()[2];
-        int desiredAliens = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien) : Math.max(1, nombreAlien);
+        int baseDesiredAliens = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien) : Math.max(1, nombreAlien);
+        int desiredAliens = getAdjustedAlienCount(baseDesiredAliens);
         if (aliveAliens >= desiredAliens) {
             return;
         }
@@ -1033,6 +1092,12 @@ public class GamePanel extends JPanel implements Runnable {
         arcadeWaveBannerTimer = ARCADE_WAVE_BANNER_FRAMES;
         int enemyReinforcements = Math.min(6, 2 + arcadeWaveIndex / 2);
         int alienReinforcements = arcadeWaveIndex >= 2 && arcadeWaveIndex % 2 == 0 ? 1 : 0;
+        if (isEasyDifficulty()) {
+            enemyReinforcements = Math.max(1, enemyReinforcements - 1);
+            if (arcadeWaveIndex % 3 == 0) {
+                alienReinforcements = 0;
+            }
+        }
         int[][] enemySpawnZones = buildEnemySpawnZones();
 
         for (int i = 0; i < enemyReinforcements; i++) {
@@ -1063,6 +1128,14 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private EnemyArchetype chooseArcadeArchetype(int index, int waveSize) {
+        if (isEasyDifficulty()) {
+            double pressure = arcadeWaveIndex + index / (double) Math.max(1, waveSize);
+            if (pressure < 3.5) {
+                return EnemyArchetype.STANDARD;
+            }
+            return index % 2 == 0 ? EnemyArchetype.FLANQUEUR : EnemyArchetype.ASSAUT;
+        }
+
         double pressure = arcadeWaveIndex + index / (double) Math.max(1, waveSize);
         if (pressure < 1.5) {
             return EnemyArchetype.STANDARD;
@@ -1104,6 +1177,10 @@ public class GamePanel extends JPanel implements Runnable {
 
         if (screenState == ScreenState.MENU) {
             if (handleMapSelectionClick(mouseX, mouseY)) {
+                return;
+            }
+
+            if (handleDifficultySelectionClick(mouseX, mouseY)) {
                 return;
             }
 
@@ -1202,6 +1279,27 @@ public class GamePanel extends JPanel implements Runnable {
         return new Rectangle(protection.x, protection.y + 62, protection.width, protection.height);
     }
 
+    private Rectangle getDifficultyButtonBounds(int index) {
+        int panelWidth = getViewWidth();
+        int buttonWidth = 130;
+        int buttonHeight = 34;
+        int totalWidth = buttonWidth * 3 + DIFFICULTY_BUTTON_GAP * 2;
+        int startX = (panelWidth - totalWidth) / 2;
+        int y = 282;
+        return new Rectangle(startX + index * (buttonWidth + DIFFICULTY_BUTTON_GAP), y, buttonWidth, buttonHeight);
+    }
+
+    private boolean handleDifficultySelectionClick(int mouseX, int mouseY) {
+        DifficultyProfile[] profiles = DifficultyProfile.values();
+        for (int i = 0; i < profiles.length; i++) {
+            if (getDifficultyButtonBounds(i).contains(mouseX, mouseY)) {
+                applyDifficultyProfile(profiles[i]);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Rectangle getMapCardBounds(int index, int total) {
         int panelWidth = getViewWidth();
         int cardHeight = 130;
@@ -1277,6 +1375,11 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void adjustAiOption(int rowIndex, int direction) {
+        boolean affectsDifficulty = rowIndex >= 0 && rowIndex <= 8;
+        if (affectsDifficulty) {
+            currentDifficulty = DifficultyProfile.CUSTOM;
+        }
+
         switch (rowIndex) {
             case 0 -> nombreSoldat = Math.max(0, Math.min(10, nombreSoldat + direction));
             case 1 -> AiTuning.adjustEnemyReactionFrames(direction);
@@ -1620,13 +1723,14 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private String getModeDisplayLabel() {
-        return switch (GameMode.current) {
+        String modeLabel = switch (GameMode.current) {
             case FREE -> "MODE LIBRE";
             case ARCADE -> "MODE ARCADE";
             case STORY -> "MODE HISTOIRE";
             case PROTECTION -> "MODE PROTECTION";
             case MISSION -> "MODE MISSION";
         };
+        return modeLabel + " - " + currentDifficulty.getLabel().toUpperCase();
     }
 
     private String getTopHudTitle() {
@@ -1925,6 +2029,17 @@ public class GamePanel extends JPanel implements Runnable {
             g2d.drawString(label, labelX, labelY);
         }
 
+        Font oldDifficultyFont = g2d.getFont();
+        g2d.setFont(oldDifficultyFont.deriveFont(Font.BOLD, 16f));
+        String difficultyTitle = "Difficulte";
+        FontMetrics diffTitleMetrics = g2d.getFontMetrics();
+        g2d.setColor(new Color(238, 238, 238));
+        g2d.drawString(difficultyTitle, (panelWidth - diffTitleMetrics.stringWidth(difficultyTitle)) / 2, 272);
+        drawDifficultyButton(g2d, getDifficultyButtonBounds(0), DifficultyProfile.EASY);
+        drawDifficultyButton(g2d, getDifficultyButtonBounds(1), DifficultyProfile.NORMAL);
+        drawDifficultyButton(g2d, getDifficultyButtonBounds(2), DifficultyProfile.CUSTOM);
+        g2d.setFont(oldDifficultyFont);
+
         drawButton(g2d, getFreeModeButtonBounds(), "Mode Libre");
         drawButton(g2d, getArcadeModeButtonBounds(), "Mode Arcade");
         drawButton(g2d, getStoryModeButtonBounds(), "Mode Histoire");
@@ -1937,6 +2052,58 @@ public class GamePanel extends JPanel implements Runnable {
         FontMetrics hintFm = g2d.getFontMetrics();
         g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight - 26);
         g2d.setFont(oldFont);
+    }
+
+    private void drawDifficultyButton(Graphics2D g2d, Rectangle rect, DifficultyProfile profile) {
+        boolean selected = currentDifficulty == profile;
+        g2d.setColor(selected ? new Color(180, 132, 54, 220) : new Color(32, 32, 32, 218));
+        g2d.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 11, 11);
+        g2d.setColor(selected ? new Color(255, 226, 148) : new Color(214, 214, 214));
+        g2d.setStroke(new BasicStroke(selected ? 2.4f : 1.6f));
+        g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 11, 11);
+
+        Font oldFont = g2d.getFont();
+        g2d.setFont(oldFont.deriveFont(Font.BOLD, 15f));
+        FontMetrics fm = g2d.getFontMetrics();
+        String label = profile.getLabel();
+        int textX = rect.x + (rect.width - fm.stringWidth(label)) / 2;
+        int textY = rect.y + (rect.height - fm.getHeight()) / 2 + fm.getAscent();
+        g2d.drawString(label, textX, textY);
+        g2d.setFont(oldFont);
+    }
+
+    private boolean isEasyDifficulty() {
+        return currentDifficulty == DifficultyProfile.EASY;
+    }
+
+    private int getAdjustedEnemyCount(int baseCount) {
+        if (!isEasyDifficulty()) {
+            return baseCount;
+        }
+        return Math.max(3, (int) Math.ceil(baseCount * 0.65));
+    }
+
+    private int getAdjustedAlienCount(int baseCount) {
+        if (!isEasyDifficulty()) {
+            return baseCount;
+        }
+        return Math.max(1, (int) Math.ceil(baseCount * 0.60));
+    }
+
+    private void applyDifficultyProfile(DifficultyProfile profile) {
+        currentDifficulty = profile;
+        switch (profile) {
+            case EASY -> {
+                nombreSoldat = 2;
+                AiTuning.applyEasyPreset();
+            }
+            case NORMAL -> {
+                nombreSoldat = 1;
+                AiTuning.applyNormalPreset();
+            }
+            case CUSTOM -> {
+            }
+        }
     }
 
     private void drawOptions(Graphics2D g2d) {

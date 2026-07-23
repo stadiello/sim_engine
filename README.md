@@ -61,6 +61,8 @@ joueur 2 sont transmis a l'hote.
   alien ou civil.
 - L'affichage de ces silhouettes peut etre active ou desactive dans `Options`,
   avec le reglage `Marqueurs des morts`.
+- Une silhouette bleue d'allie peut etre reanimee : approche-toi et appuie sur
+  `E`. Cela fonctionne pour les soldats allies et les partenaires coop.
 - Trois depots de munitions sont places sur chaque carte. Ils restaurent
   automatiquement les reserves de toutes les armes lorsqu'un joueur s'en approche.
 - Chaque depot possede un delai de six secondes distinct pour chaque joueur.

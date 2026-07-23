@@ -12,6 +12,7 @@ import main.GamePanel;
 
 /** Silhouette persistante au sol indiquant le type et la faction d'un mort. */
 public final class DeathMarker extends GameObject {
+    private static final double REVIVE_RADIUS = 68.0;
     private enum MarkerType {
         ALLY,
         HOSTILE,
@@ -21,17 +22,22 @@ public final class DeathMarker extends GameObject {
 
     private final MarkerType type;
     private final double rotation;
+    private final Homme fallenAlly;
 
     public DeathMarker(Homme victim) {
         super(victim.x, victim.y);
         if (victim instanceof Alien) {
             type = MarkerType.ALIEN;
+            fallenAlly = null;
         } else if (victim instanceof Ennemi) {
             type = MarkerType.HOSTILE;
+            fallenAlly = null;
         } else if (victim instanceof Soldat || victim instanceof Protagonist) {
             type = MarkerType.ALLY;
+            fallenAlly = victim;
         } else {
             type = MarkerType.CIVILIAN;
+            fallenAlly = null;
         }
         rotation = ((Double.doubleToLongBits(x * 31.0 + y * 17.0) & 1023L) / 1023.0) * Math.PI * 2.0;
     }
@@ -61,6 +67,44 @@ public final class DeathMarker extends GameObject {
         g2d.setStroke(oldStroke);
         g2d.setComposite(oldComposite);
         g2d.setTransform(oldTransform);
+
+        if (fallenAlly != null && hasNearbyPlayer()) {
+            g2d.setColor(new Color(125, 245, 170));
+            g2d.setFont(g2d.getFont().deriveFont(java.awt.Font.BOLD, 11f));
+            String label = "E - REANIMER";
+            java.awt.FontMetrics metrics = g2d.getFontMetrics();
+            g2d.drawString(label, (int) x - metrics.stringWidth(label) / 2, (int) y + 35);
+        }
+    }
+
+    public boolean tryRevive(Protagonist rescuer) {
+        if (fallenAlly == null || rescuer == null) return false;
+        double dx = rescuer.x - x;
+        double dy = rescuer.y - y;
+        if (dx * dx + dy * dy > REVIVE_RADIUS * REVIVE_RADIUS) return false;
+
+        if (fallenAlly instanceof Protagonist player) {
+            player.x = x;
+            player.y = y;
+            player.vx = 0;
+            player.vy = 0;
+            player.setControlsEnabled(true);
+            ObjectManager.list.add(player);
+        } else {
+            ObjectManager.list.add(new Soldat(x, y));
+        }
+        ObjectManager.list.remove(this);
+        return true;
+    }
+
+    private boolean hasNearbyPlayer() {
+        for (Homme human : ObjectManager.getLivingHumans()) {
+            if (!(human instanceof Protagonist player)) continue;
+            double dx = player.x - x;
+            double dy = player.y - y;
+            if (dx * dx + dy * dy <= REVIVE_RADIUS * REVIVE_RADIUS) return true;
+        }
+        return false;
     }
 
     private void drawHumanMarker(Graphics2D g2d) {

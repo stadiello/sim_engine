@@ -25,6 +25,8 @@ public final class TeslaArc extends GameObject {
     private static final double CHAIN_RANGE = 220.0;
     private static final int MAX_TARGETS = 5;
     private static final int MAX_LIFETIME = 14;
+    private static final double CANON_FORWARD_ANCHOR = -5.0;
+    private static final double CANON_LATERAL_ANCHOR = 23.0;
 
     private final ArrayList<double[]> points = new ArrayList<>();
     private int lifetime = MAX_LIFETIME;
@@ -138,7 +140,8 @@ public final class TeslaArc extends GameObject {
         for (int i = 1; i < points.size(); i++) {
             double[] start = points.get(i - 1);
             double[] end = points.get(i);
-            drawBolt(g2d, start[0], start[1], end[0], end[1], i, alpha);
+            double[] anchoredStart = getSegmentStartPoint(start, end, i == 1);
+            drawBolt(g2d, anchoredStart[0], anchoredStart[1], end[0], end[1], i, alpha);
         }
 
         g2d.setStroke(oldStroke);
@@ -146,6 +149,28 @@ public final class TeslaArc extends GameObject {
         if (oldAntialias != null) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAntialias);
         }
+    }
+
+    private double[] getSegmentStartPoint(double[] start, double[] end, boolean isPrimarySegment) {
+        if (!isPrimarySegment) {
+            return start;
+        }
+
+        double dx = end[0] - start[0];
+        double dy = end[1] - start[1];
+        double length = Math.hypot(dx, dy);
+        if (length <= 0.0001) {
+            return start;
+        }
+
+        double dirX = dx / length;
+        double dirY = dy / length;
+        double perpX = -dirY;
+        double perpY = dirX;
+        return new double[]{
+                start[0] + dirX * CANON_FORWARD_ANCHOR + perpX * CANON_LATERAL_ANCHOR,
+                start[1] + dirY * CANON_FORWARD_ANCHOR + perpY * CANON_LATERAL_ANCHOR
+        };
     }
 
     private void drawBolt(Graphics2D g2d, double startX, double startY, double endX, double endY,

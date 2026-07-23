@@ -12,6 +12,7 @@ import javax.sound.sampled.Clip;
 
 public class Utils {
 
+	private static final SoundPool ELECTRIC_POOL = new SoundPool("/sound/electric.wav", 4, 8_000_000L);
 	private static final SoundPool LASER_POOL = new SoundPool("/sound/laser.wav", 4, 8_000_000L);
 	private static final SoundPool SMG_POOL = new SoundPool("/sound/smg.wav", 10, 12_000_000L);
 	private static final SoundPool PISTOL_POOL = new SoundPool("/sound/pistol.wav", 5, 20_000_000L);
@@ -25,6 +26,10 @@ public class Utils {
 	});
 
 	private Utils() {}
+
+	public static void playElectricSound() {
+		dispatch(ELECTRIC_POOL);
+	}
 
 	public static void playLaserSound() {
 		dispatch(LASER_POOL);

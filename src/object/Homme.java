@@ -126,9 +126,7 @@ public class Homme extends GameObject {
 
     @Override
     public void onDeath() {
-        if (main.GamePanel.areDeathMarkersEnabled()) {
-            ObjectManager.list.add(new DeathMarker(this));
-        }
+        ObjectManager.list.add(new DeathMarker(this));
     }
 
 }

@@ -22,6 +22,7 @@ public final class Weapon {
     private static final double MUZZLE_LEFT_BIAS = 10.0;
 
     public enum FireSound {
+        ELECTRIC,
         LASER,
         SMG,
         PISTOL,
@@ -162,14 +163,14 @@ public final class Weapon {
             Projectile.ProjectileType.TESLA,
             52,
             1,
-            18,
-            44,
-            -19,
-            -32,
+            10,
+            30,
+            5,
+            -23,
             14,
             false,
             false,
-            FireSound.LASER,
+            FireSound.ELECTRIC,
             4,
             20,
             95);
@@ -571,6 +572,7 @@ public final class Weapon {
 
     private void playSound() {
         switch (fireSound) {
+            case ELECTRIC -> Utils.playElectricSound();
             case LASER -> Utils.playLaserSound();
             case SMG -> Utils.playSmgSound();
             case PISTOL -> Utils.playPistolSound();
