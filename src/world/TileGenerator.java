@@ -257,4 +257,34 @@ public class TileGenerator {
         g.dispose();
         return img;
     }
+
+    public static BufferedImage generateDesertBarricade() {
+        BufferedImage img = generateSand();
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g.setColor(new Color(74, 60, 43, 90));
+        g.fillRoundRect(3, 12, TILE_SIZE - 6, 30, 12, 12);
+
+        for (int row = 0; row < 2; row++) {
+            int y = 13 + row * 13;
+            int offset = row == 0 ? 0 : -8;
+            for (int x = -7 + offset; x < TILE_SIZE; x += 17) {
+                g.setColor(new Color(171, 143, 94));
+                g.fillRoundRect(x, y, 20, 12, 8, 8);
+                g.setColor(new Color(104, 82, 54));
+                g.setStroke(new BasicStroke(1.4f));
+                g.drawRoundRect(x, y, 20, 12, 8, 8);
+                g.drawLine(x + 10, y + 2, x + 10, y + 10);
+            }
+        }
+
+        g.setColor(new Color(92, 99, 94));
+        g.setStroke(new BasicStroke(3f));
+        g.drawLine(5, 10, 5, 43);
+        g.drawLine(TILE_SIZE - 6, 10, TILE_SIZE - 6, 43);
+        g.drawLine(3, 12, TILE_SIZE - 4, 39);
+        g.dispose();
+        return img;
+    }
 }

@@ -124,4 +124,11 @@ public class Homme extends GameObject {
         return COLLISION_RADIUS;
     }
 
+    @Override
+    public void onDeath() {
+        if (main.GamePanel.areDeathMarkersEnabled()) {
+            ObjectManager.list.add(new DeathMarker(this));
+        }
+    }
+
 }

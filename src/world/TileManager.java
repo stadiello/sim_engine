@@ -77,6 +77,7 @@ public class TileManager {
         tiles[6] = new Tile(TileGenerator.generateTree(), true, false, true, 8);
         tiles[7] = new Tile(TileGenerator.generateSand(), false, false, false, 0);
         tiles[8] = new Tile(TileGenerator.generateWoodenCrate(), true, false, true, 6);
+        tiles[9] = new Tile(TileGenerator.generateDesertBarricade(), true, false, true, 10);
     }
 
     public void setCurrentMapType(MapType mapType) {
@@ -377,6 +378,22 @@ public class TileManager {
                 {12, 10, 8}, {21, 10, 8}, {33, 10, 8},
                 {12, 19, 8}, {34, 20, 8},
                 {14, 30, 8}, {24, 30, 8}, {36, 30, 8}
+            }
+        );
+
+        // Position fortifiee en bas a droite. L'ouverture au nord-ouest
+        // conserve un acces joueur et un large champ de tir pour la tourelle.
+        for (int row = 29; row <= 34; row++) {
+            for (int col = 40; col <= 46; col++) {
+                mapData[row][col] = 7;
+            }
+        }
+        placeDestructibleCovers(
+            mapData,
+            new int[][]{
+                {41, 33, 9}, {42, 33, 9}, {43, 33, 9}, {44, 33, 9}, {45, 33, 9},
+                {45, 31, 9}, {45, 32, 9},
+                {41, 32, 9}
             }
         );
 

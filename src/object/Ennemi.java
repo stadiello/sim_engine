@@ -90,6 +90,7 @@ public class Ennemi extends Homme {
 
     @Override
     public void onDeath() {
+        super.onDeath();
         if (GameMode.current == GameMode.STORY || GameMode.current == GameMode.MISSION) {
             int droppedMagAmmo = Math.max(0, Math.min(
                 carriedWeapon.getMagazineCapacity(),

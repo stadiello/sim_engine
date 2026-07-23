@@ -378,7 +378,7 @@ public class ObjectManager {
             if (removedSnapshot.contains(obj)) {
                 continue;
             }
-            if (obj instanceof Douille) {
+            if (obj instanceof Douille || obj instanceof DeathMarker) {
                 obj.draw(g);
             }
         }
@@ -388,7 +388,7 @@ public class ObjectManager {
             if (removedSnapshot.contains(obj)) {
                 continue;
             }
-            if (!(obj instanceof Douille)) {
+            if (!(obj instanceof Douille) && !(obj instanceof DeathMarker)) {
                 obj.draw(g);
             }
         }

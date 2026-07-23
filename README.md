@@ -55,6 +55,20 @@ la meme camera et doivent rester relativement proches. Les mouvements, la visee,
 les tirs, le rechargement, le changement d'arme et les interactions de mission du
 joueur 2 sont transmis a l'hote.
 
+## Marqueurs de morts et depots
+
+- Les morts laissent une silhouette au sol propre a leur faction : allie, hostile,
+  alien ou civil.
+- L'affichage de ces silhouettes peut etre active ou desactive dans `Options`,
+  avec le reglage `Marqueurs des morts`.
+- Trois depots de munitions sont places sur chaque carte. Ils restaurent
+  automatiquement les reserves de toutes les armes lorsqu'un joueur s'en approche.
+- Chaque depot possede un delai de six secondes distinct pour chaque joueur.
+
+Sur la carte `Desert tactique`, la tourelle fortifiee est manuelle : approche-toi,
+appuie sur `E`, vise avec la souris et tire avec le clic gauche. Appuie de nouveau
+sur `E` pour quitter la tourelle.
+
 Il est aussi possible de choisir directement le role en ligne de commande apres
 compilation :
 

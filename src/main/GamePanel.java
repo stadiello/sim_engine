@@ -17,6 +17,8 @@ import object.ai.AiTuning;
 import object.ai.TacticalMovement;
 import object.Alien;
 import object.AlienTeleport;
+import object.AmmoDepot;
+import object.DesertTurret;
 import object.Ennemi;
 import object.Ennemi.EnemyArchetype;
 import object.Homme;
@@ -70,9 +72,9 @@ public class GamePanel extends JPanel implements Runnable {
     private static final int MAX_SPAWN_ATTEMPTS = 300;
     private static final double SAFE_HOSTILE_SPAWN_DISTANCE = 520;
     private static final int ALIEN_RESPAWN_COOLDOWN_FRAMES = TARGET_UPS * 2;
-    private static final int AI_OPTIONS_BASE_Y = 292;
-    private static final int AI_OPTION_ROW_GAP = 34;
-    private static final int AI_OPTION_COUNT = 11;
+    private static final int AI_OPTIONS_BASE_Y = 190;
+    private static final int AI_OPTION_ROW_GAP = 26;
+    private static final int AI_OPTION_COUNT = 12;
     private static final int MENU_MAP_CARD_GAP = 26;
     private static final float NIGHT_DARKNESS_ALPHA = 0.86f;
     private static final double PLAYER_FLASHLIGHT_RANGE = 320;
@@ -103,6 +105,7 @@ public class GamePanel extends JPanel implements Runnable {
     private int alienRespawnCooldownFrames = 0;
     private static boolean unlimitedAmmoEnabled = false;
     private static boolean fireCameraFeedbackEnabled = true;
+    private static boolean deathMarkersEnabled = true;
     private int missionRotationIndex = 0;
     private MissionType activeMissionType;
     private String activeMissionTitle = "";
@@ -206,6 +209,8 @@ public class GamePanel extends JPanel implements Runnable {
             );
             ObjectManager.list.add(new Soldat(soldatSpawn[0], soldatSpawn[1]));
         }
+        spawnAmmoDepots();
+        spawnMapSpecificObjects();
 
         int aliensToSpawn = GameMode.current == GameMode.ARCADE ? Math.max(2, nombreAlien - 1) : nombreAlien;
         for (int i = 0; i < aliensToSpawn; i++) {
@@ -235,6 +240,33 @@ public class GamePanel extends JPanel implements Runnable {
 
         if (GameMode.current == GameMode.MISSION) {
             setupMission(protagonistSpawnX, protagonistSpawnY);
+        }
+    }
+
+    private void spawnAmmoDepots() {
+        int maxCol = tileManager.getMapCols() - 2;
+        int maxRow = tileManager.getMapRows() - 2;
+        int centerCol = maxCol / 2;
+        int centerRow = maxRow / 2;
+        boolean desertTactical = tileManager.getCurrentMapType() == MapType.DESERT_TACTICAL;
+        int[][] zones = {
+                {4, Math.min(10, maxCol), 3, Math.min(9, maxRow)},
+                {Math.max(2, centerCol - 3), Math.min(maxCol, centerCol + 3),
+                        Math.max(2, centerRow - 3), Math.min(maxRow, centerRow + 3)},
+                desertTactical
+                        ? new int[]{Math.max(2, maxCol - 17), Math.max(2, maxCol - 11),
+                                Math.max(2, maxRow - 9), maxRow}
+                        : new int[]{Math.max(2, maxCol - 9), maxCol, Math.max(2, maxRow - 9), maxRow}
+        };
+        for (int[] zone : zones) {
+            double[] position = getFreeSpawnPositionInZone(zone[0], zone[1], zone[2], zone[3]);
+            ObjectManager.list.add(new AmmoDepot(position[0], position[1]));
+        }
+    }
+
+    private void spawnMapSpecificObjects() {
+        if (tileManager.getCurrentMapType() == MapType.DESERT_TACTICAL) {
+            ObjectManager.list.add(new DesertTurret(43.5 * tileSize, 31.5 * tileSize));
         }
     }
 
@@ -395,18 +427,12 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
-    private void updateMissionMode(Protagonist protagonist) {
+    private void updateMissionMode(Protagonist protagonist, Protagonist interactionPlayer, boolean interactTriggered) {
         if (GameMode.current != GameMode.MISSION || activeMissionType == null || protagonist == null || missionFailed) {
             return;
         }
 
-        boolean interactTriggered = keyController.consumeInteractTriggered();
-        Protagonist interactionPlayer = protagonist;
-        RemotePlayerInput remoteInput = remotePlayerInput;
-        if (remoteInput != null && remoteInput.consumeInteractTriggered() && remoteProtagonist != null) {
-            interactTriggered = true;
-            interactionPlayer = remoteProtagonist;
-        }
+        if (interactionPlayer == null) interactionPlayer = protagonist;
 
         switch (activeMissionType) {
             case RESCUE_HOSTAGES -> updateRescueMission(interactionPlayer, interactTriggered);
@@ -871,11 +897,14 @@ public class GamePanel extends JPanel implements Runnable {
         tickScreenFeedback();
 
         if (screenState == ScreenState.PLAYING && !paused) {
+            Protagonist protagonist = ObjectManager.getProtagonist();
+            Protagonist interactionPlayer = consumeInteractionPlayer(protagonist);
+            boolean interactionUsedByTurret = tryToggleDesertTurret(interactionPlayer);
             applySoldierMoveCommand();
             ObjectManager.updateAll();
             maintainAlienPresence();
             updateArcadeMode();
-            Protagonist protagonist = ObjectManager.getProtagonist();
+            protagonist = ObjectManager.getProtagonist();
             if (protagonist == null) {
                 gameOverTitle = "VOUS ETES MORT";
                 screenState = ScreenState.GAME_OVER;
@@ -884,7 +913,8 @@ public class GamePanel extends JPanel implements Runnable {
             }
 
             if (GameMode.current == GameMode.MISSION) {
-                updateMissionMode(protagonist);
+                updateMissionMode(protagonist, interactionPlayer,
+                        interactionPlayer != null && !interactionUsedByTurret);
                 if (screenState != ScreenState.PLAYING) {
                     return;
                 }
@@ -909,6 +939,27 @@ public class GamePanel extends JPanel implements Runnable {
 
             updateCamera();
         }
+    }
+
+    private Protagonist consumeInteractionPlayer(Protagonist primaryPlayer) {
+        if (keyController.consumeInteractTriggered()) {
+            return primaryPlayer;
+        }
+        RemotePlayerInput remoteInput = remotePlayerInput;
+        if (remoteInput != null && remoteInput.consumeInteractTriggered()) {
+            return remoteProtagonist;
+        }
+        return null;
+    }
+
+    private boolean tryToggleDesertTurret(Protagonist player) {
+        if (player == null) return false;
+        for (GameObject object : new ArrayList<>(ObjectManager.list)) {
+            if (object instanceof DesertTurret turret && turret.tryToggleOperator(player)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void maintainAlienPresence() {
@@ -1192,7 +1243,7 @@ public class GamePanel extends JPanel implements Runnable {
         int buttonWidth = 220;
         int buttonHeight = 52;
         int x = (panelWidth - buttonWidth) / 2;
-        int y = panelHeight - 120;
+        int y = panelHeight - 62;
         return new Rectangle(x, y, buttonWidth, buttonHeight);
     }
 
@@ -1243,6 +1294,7 @@ public class GamePanel extends JPanel implements Runnable {
             }
             case 9 -> unlimitedAmmoEnabled = !unlimitedAmmoEnabled;
             case 10 -> fireCameraFeedbackEnabled = !fireCameraFeedbackEnabled;
+            case 11 -> deathMarkersEnabled = !deathMarkersEnabled;
             default -> {
             }
         }
@@ -1254,6 +1306,10 @@ public class GamePanel extends JPanel implements Runnable {
 
     public static boolean isFireCameraFeedbackEnabled() {
         return fireCameraFeedbackEnabled;
+    }
+
+    public static boolean areDeathMarkersEnabled() {
+        return deathMarkersEnabled;
     }
 
     private Rectangle getReplayButtonBounds() {
@@ -1912,6 +1968,7 @@ public class GamePanel extends JPanel implements Runnable {
         drawAiOptionRow(g2d, 8, "Aliens meute agressive", AiTuning.isAlienPackAggroEnabled() ? "ON" : "OFF");
         drawAiOptionRow(g2d, 9, "Munitions illimitees", unlimitedAmmoEnabled ? "ON" : "OFF");
         drawAiOptionRow(g2d, 10, "Feedback camera des tirs", fireCameraFeedbackEnabled ? "ON" : "OFF");
+        drawAiOptionRow(g2d, 11, "Marqueurs des morts", deathMarkersEnabled ? "ON" : "OFF");
 
         drawButton(g2d, getBackButtonBounds(), "Retour");
         g2d.setFont(oldFont);

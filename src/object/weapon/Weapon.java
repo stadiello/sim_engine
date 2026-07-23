@@ -15,6 +15,7 @@ import object.Homme;
 import object.ObjectManager;
 import object.Projectile;
 import object.Protagonist;
+import object.TeslaArc;
 
 public final class Weapon {
 
@@ -114,7 +115,7 @@ public final class Weapon {
             0,
             false,
             false,
-            FireSound.GRENADE,
+            FireSound.NONE,
             1,
             2,
             1);
@@ -155,6 +156,24 @@ public final class Weapon {
             240,
             140);
 
+    private static final Weapon TESLA_CANNON = new Weapon(
+            "Canon Tesla",
+            null,
+            Projectile.ProjectileType.TESLA,
+            52,
+            1,
+            18,
+            44,
+            -19,
+            -32,
+            14,
+            false,
+            false,
+            FireSound.LASER,
+            4,
+            20,
+            95);
+
     public static Weapon blaster() {
         return BLASTER.copy();
     }
@@ -183,8 +202,12 @@ public final class Weapon {
         return ROCKET_LAUNCHER.copy();
     }
 
+    public static Weapon teslaCannon() {
+        return TESLA_CANNON.copy();
+    }
+
     public static Weapon[] protagonistLoadout() {
-        return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade(), minigun(), rocketLauncher()};
+        return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade(), minigun(), rocketLauncher(), teslaCannon()};
     }
 
     public static Weapon[] storyLoadout() {
@@ -323,6 +346,14 @@ public final class Weapon {
         return "Lance-roquettes".equals(name);
     }
 
+    public boolean isGrenade() {
+        return projectileType == Projectile.ProjectileType.GRENADE;
+    }
+
+    public boolean isTeslaCannon() {
+        return projectileType == Projectile.ProjectileType.TESLA;
+    }
+
     public boolean isAutomatic() {
         return automatic;
     }
@@ -374,6 +405,12 @@ public final class Weapon {
         int previous = reserveAmmo;
         reserveAmmo = Math.min(maxReserveAmmo, reserveAmmo + amount);
         return reserveAmmo - previous;
+    }
+
+    public int refillReserveAmmo() {
+        int added = maxReserveAmmo - reserveAmmo;
+        reserveAmmo = maxReserveAmmo;
+        return Math.max(0, added);
     }
 
     public int mergeAmmoFrom(Weapon other) {
@@ -455,7 +492,9 @@ public final class Weapon {
             triggerFireFeedback();
         }
 
-        if (projectileType == Projectile.ProjectileType.SHOTGUN_PELLET) {
+        if (projectileType == Projectile.ProjectileType.TESLA) {
+            ObjectManager.list.add(new TeslaArc(muzzleOrigin[0], muzzleOrigin[1], dirX, dirY, shooter));
+        } else if (projectileType == Projectile.ProjectileType.SHOTGUN_PELLET) {
             int pelletCount = 8;
             double spreadAngle = Math.PI / 6;
             double baseAngle = Math.atan2(dirY, dirX);
@@ -492,7 +531,7 @@ public final class Weapon {
     }
 
     public void draw(Graphics2D g2d, double x, double y, int timer, boolean shot) {
-        if (sprite == null && !isMinigun()) {
+        if (sprite == null && !isMinigun() && !isTeslaCannon()) {
             return;
         }
 
@@ -505,6 +544,21 @@ public final class Weapon {
 
         int baseX = (int) x + drawOffsetX;
         int baseY = (int) y + drawOffsetY + offsetArme;
+        if (isTeslaCannon()) {
+            g2d.setColor(new Color(18, 31, 54));
+            g2d.fillRoundRect(baseX, baseY, drawWidth, drawHeight, 9, 9);
+            g2d.setColor(new Color(62, 154, 255));
+            g2d.fillRoundRect(baseX + 5, baseY + 5, drawWidth - 10, drawHeight - 10, 6, 6);
+            g2d.setColor(new Color(110, 225, 255));
+            g2d.drawArc(baseX - 3, baseY + 11, drawWidth + 6, 9, 180, 180);
+            g2d.drawArc(baseX - 3, baseY + 23, drawWidth + 6, 9, 180, 180);
+            g2d.setColor(new Color(210, 250, 255));
+            int pulse = shot ? 9 : 5;
+            g2d.fillOval(baseX + drawWidth / 2 - pulse / 2, baseY - pulse / 2, pulse, pulse);
+            g2d.setColor(new Color(99, 220, 255));
+            g2d.drawLine(baseX + 3, baseY + drawHeight - 3, baseX + drawWidth - 3, baseY + drawHeight - 3);
+            return;
+        }
         g2d.setColor(new Color(36, 42, 48));
         g2d.fillRoundRect(baseX, baseY, drawWidth, drawHeight, 4, 4);
         g2d.setColor(new Color(88, 99, 112));
@@ -528,6 +582,11 @@ public final class Weapon {
     }
 
     private void triggerFireFeedback() {
+        if (projectileType == Projectile.ProjectileType.TESLA) {
+            GamePanel.triggerScreenShake(8, 4.2);
+            GamePanel.triggerScreenFlash(new Color(105, 215, 255), 0.18f, 7);
+            return;
+        }
         if (projectileType == Projectile.ProjectileType.GRENADE) {
             GamePanel.triggerScreenShake(10, 5.0);
             GamePanel.triggerScreenFlash(new Color(255, 226, 180), 0.12f, 5);
@@ -574,6 +633,9 @@ public final class Weapon {
         if (isRocketLauncher()) {
             return base + 5.0;
         }
+        if (isTeslaCannon()) {
+            return 38.0;
+        }
         if (projectileType == Projectile.ProjectileType.GRENADE) {
             return base + 1.0;
         }
@@ -587,6 +649,9 @@ public final class Weapon {
         }
         if (isMinigun()) {
             return centerY - 1.0;
+        }
+        if (isTeslaCannon()) {
+            return 0.0;
         }
         if (isRocketLauncher()) {
             return centerY + 1.0;
@@ -614,6 +679,9 @@ public final class Weapon {
     }
 
     private static Image loadImage(String assetPath) {
+        if (assetPath == null || assetPath.isBlank()) {
+            return null;
+        }
         try {
             var stream = Weapon.class.getResourceAsStream(assetPath);
             if (stream == null) {

@@ -33,6 +33,7 @@ public class Protagonist extends Homme{
     private double facingY;
     private int selectedWeaponIndex = 0;
     private int armorPlates = 0;
+    private boolean controlsEnabled = true;
 
     static {
         try {
@@ -62,6 +63,18 @@ public class Protagonist extends Homme{
 
     public boolean isPrimaryPlayer() {
         return primaryPlayer;
+    }
+
+    public PlayerInput getPlayerInput() {
+        return keyController;
+    }
+
+    public void setControlsEnabled(boolean enabled) {
+        controlsEnabled = enabled;
+        if (!enabled) {
+            vx = 0;
+            vy = 0;
+        }
     }
 
     private static Weapon[] getInitialLoadout() {
@@ -135,6 +148,14 @@ public class Protagonist extends Homme{
 
     public int getMaxArmorPlates() {
         return MAX_ARMOR_PLATES;
+    }
+
+    public boolean restockAmmunition() {
+        boolean restocked = false;
+        for (Weapon weapon : loadout) {
+            restocked |= weapon.refillReserveAmmo() > 0;
+        }
+        return restocked;
     }
 
     @Override
@@ -215,6 +236,15 @@ public class Protagonist extends Homme{
     @Override
     public void update() {
         tickSuppression();
+
+        if (!controlsEnabled) {
+            vx = 0;
+            vy = 0;
+            if (shootCooldown > 0) shootCooldown--;
+            tickReload();
+            timer++;
+            return;
+        }
 
         double inputX = 0;
         double inputY = 0;
@@ -300,6 +330,10 @@ public class Protagonist extends Homme{
 
     private void startReloadIfPossible(Weapon weapon) {
         if (weapon != null && reloadTimer == 0 && weapon.canReload()) {
+            if (weapon.isGrenade()) {
+                weapon.reload();
+                return;
+            }
             reloadTimer = weapon.getReloadFrames();
             Utils.playReloadSound();
         }
@@ -309,6 +343,9 @@ public class Protagonist extends Homme{
         if (weapon.fire(this, facingX, facingY)) {
             shootCooldown = weapon.getCooldownFrames();
             shot = true;
+            if (weapon.isGrenade() && weapon.canReload()) {
+                weapon.reload();
+            }
             return;
         }
 

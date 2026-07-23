@@ -40,7 +40,8 @@ public class Projectile extends GameObject {
         BULLET,
         SHOTGUN_PELLET,
         GRENADE,
-        ROCKET
+        ROCKET,
+        TESLA
     }
 
     static {
