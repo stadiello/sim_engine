@@ -7,6 +7,12 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 import gameController.GameKeyController;
 import gameController.RemotePlayerInput;
@@ -124,6 +130,9 @@ public class GamePanel extends JPanel implements Runnable {
     private volatile String networkConnectionStatus = "Connexion a l'hote...";
     private final long[] networkSoundCounters = new long[Utils.SOUND_COUNT];
     private boolean networkSoundCountersInitialized;
+    private final Map<Long, NetworkReplica> networkReplicas = new LinkedHashMap<>();
+    private final IdentityHashMap<GameObject, Long> networkObjectIds = new IdentityHashMap<>();
+    private long nextNetworkObjectId = 1;
     private ScreenState screenState = ScreenState.MENU;
     private boolean paused = false;
     private String gameOverTitle = "VOUS ETES MORT";
@@ -182,6 +191,22 @@ public class GamePanel extends JPanel implements Runnable {
     public void configureNetworkReplicaView() {
         networkReplicaView = true;
         screenState = ScreenState.MENU;
+        ObjectManager.list.clear();
+    }
+
+    public int getNetworkMapType() {
+        return tileManager.getCurrentMapType().ordinal();
+    }
+
+    public int getNetworkGameMode() {
+        return GameMode.current.ordinal();
+    }
+
+    public void configureNetworkWorld(int mapType, int gameMode) {
+        MapType[] maps = MapType.values();
+        if (mapType >= 0 && mapType < maps.length) tileManager.setCurrentMapType(maps[mapType]);
+        GameMode[] modes = GameMode.values();
+        if (gameMode >= 0 && gameMode < modes.length) GameMode.current = modes[gameMode];
     }
 
     public void setNetworkConnectionStatus(String status) {
@@ -198,23 +223,33 @@ public class GamePanel extends JPanel implements Runnable {
         if (snapshot == null) return;
         applyNetworkSounds(snapshot);
         networkSnapshot = snapshot;
-        MapType[] maps = MapType.values();
-        if (snapshot.mapType >= 0 && snapshot.mapType < maps.length) {
-            tileManager.setCurrentMapType(maps[snapshot.mapType]);
-        }
-        GameMode[] modes = GameMode.values();
-        if (snapshot.gameMode >= 0 && snapshot.gameMode < modes.length) {
-            GameMode.current = modes[snapshot.gameMode];
-        }
         ScreenState[] states = ScreenState.values();
         if (snapshot.screenState >= 0 && snapshot.screenState < states.length) {
             screenState = states[snapshot.screenState];
         }
         score = snapshot.score;
-        ObjectManager.list.clear();
-        for (WorldSnapshot.Entity entity : snapshot.entities) {
-            ObjectManager.list.add(new NetworkReplica(entity));
+        for (WorldSnapshot.TileMutation mutation : snapshot.tileMutations) {
+            tileManager.applyNetworkTileMutation(
+                    mutation.row, mutation.col, mutation.tileId, mutation.damage);
         }
+        Set<Long> presentIds = new HashSet<>();
+        for (WorldSnapshot.Entity entity : snapshot.entities) {
+            presentIds.add(entity.id);
+            NetworkReplica replica = networkReplicas.get(entity.id);
+            if (replica == null || replica.getNetworkType() != entity.type) {
+                if (replica != null) ObjectManager.list.remove(replica);
+                replica = new NetworkReplica(entity);
+                networkReplicas.put(entity.id, replica);
+                ObjectManager.list.add(replica);
+            } else {
+                replica.apply(entity);
+            }
+        }
+        networkReplicas.entrySet().removeIf(entry -> {
+            if (presentIds.contains(entry.getKey())) return false;
+            ObjectManager.list.remove(entry.getValue());
+            return true;
+        });
         tileManager.centerCameraOn(snapshot.playerX, snapshot.playerY, getViewWidth(), getViewHeight());
         repaint();
     }
@@ -236,11 +271,17 @@ public class GamePanel extends JPanel implements Runnable {
 
     public WorldSnapshot createSnapshotForRemote() {
         WorldSnapshot snapshot = new WorldSnapshot();
-        snapshot.mapType = tileManager.getCurrentMapType().ordinal();
-        snapshot.gameMode = GameMode.current.ordinal();
         snapshot.screenState = screenState.ordinal();
         snapshot.score = score;
         snapshot.soundCounters = Utils.getSoundCounters();
+        for (int[] tile : tileManager.getNetworkTileMutations()) {
+            WorldSnapshot.TileMutation mutation = new WorldSnapshot.TileMutation();
+            mutation.row = tile[0];
+            mutation.col = tile[1];
+            mutation.tileId = tile[2];
+            mutation.damage = tile[3];
+            snapshot.tileMutations.add(mutation);
+        }
         Protagonist remote = remoteProtagonist;
         if (remote != null) {
             snapshot.playerX = remote.x;
@@ -257,7 +298,11 @@ public class GamePanel extends JPanel implements Runnable {
                 snapshot.reserveAmmo = remote.getCurrentWeapon().getReserveAmmo();
             }
         }
-        for (GameObject object : ObjectManager.getObjectSnapshot()) {
+        ArrayList<GameObject> currentObjects = ObjectManager.getObjectSnapshot();
+        Set<GameObject> currentObjectSet = Collections.newSetFromMap(new IdentityHashMap<>());
+        currentObjectSet.addAll(currentObjects);
+        networkObjectIds.keySet().removeIf(object -> !currentObjectSet.contains(object));
+        for (GameObject object : currentObjects) {
             WorldSnapshot.Entity entity = toNetworkEntity(object, remote);
             if (entity != null) snapshot.entities.add(entity);
         }
@@ -266,6 +311,7 @@ public class GamePanel extends JPanel implements Runnable {
 
     private WorldSnapshot.Entity toNetworkEntity(GameObject object, Protagonist remote) {
         WorldSnapshot.Entity entity = new WorldSnapshot.Entity();
+        entity.id = networkObjectIds.computeIfAbsent(object, ignored -> nextNetworkObjectId++);
         entity.x = object.x;
         entity.y = object.y;
         entity.vx = object.vx;
@@ -281,7 +327,7 @@ public class GamePanel extends JPanel implements Runnable {
             entity.detail = soldier.getCarriedWeapon().getName();
         } else if (object instanceof Ennemi enemy) {
             entity.type = NetworkReplica.ENEMY;
-            entity.variant = (byte) (enemy.getArchetype() == EnemyArchetype.ROQUETTE ? 2 : 1);
+            entity.variant = (byte) (enemy.getArchetype().ordinal() + 1);
             entity.facingX = enemy.getFacingX();
             entity.facingY = enemy.getFacingY();
             entity.detail = enemy.getCarriedWeapon().getName();

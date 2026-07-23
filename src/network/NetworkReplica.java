@@ -1,6 +1,10 @@
 package network;
 
-import object.GameObject;
+import gameController.GameKeyController;
+import object.*;
+import object.Ennemi.EnemyArchetype;
+import object.Projectile.ProjectileType;
+import object.weapon.Weapon;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -37,16 +41,29 @@ public final class NetworkReplica extends GameObject {
     private static final BufferedImage SHELL_IMAGE = load("/assets/effets/douille.png");
 
     private final byte type;
-    private final byte variant;
-    private final double facingX;
-    private final double facingY;
-    private final boolean localPlayer;
-    private final String detail;
-    private final int amount;
+    private byte variant;
+    private double facingX;
+    private double facingY;
+    private boolean localPlayer;
+    private String detail;
+    private int amount;
+    private final GameObject baseRenderer;
 
     public NetworkReplica(WorldSnapshot.Entity entity) {
         super(entity.x, entity.y);
         type = entity.type;
+        apply(entity);
+        baseRenderer = createBaseRenderer();
+        syncBaseRenderer();
+    }
+
+    public byte getNetworkType() {
+        return type;
+    }
+
+    public void apply(WorldSnapshot.Entity entity) {
+        x = entity.x;
+        y = entity.y;
         variant = entity.variant;
         vx = entity.vx;
         vy = entity.vy;
@@ -55,6 +72,7 @@ public final class NetworkReplica extends GameObject {
         localPlayer = entity.localPlayer;
         detail = entity.detail == null ? "" : entity.detail;
         amount = entity.amount;
+        syncBaseRenderer();
     }
 
     @Override
@@ -64,6 +82,14 @@ public final class NetworkReplica extends GameObject {
 
     @Override
     public void draw(Graphics g) {
+        if (baseRenderer != null) {
+            syncBaseRenderer();
+            baseRenderer.draw(g);
+            if (type == DEATH_MARKER && variant == 1 && amount == 1) {
+                drawCenteredLabel((Graphics2D) g, "E - REANIMER", 35, new Color(125, 245, 170));
+            }
+            return;
+        }
         Graphics2D g2d = (Graphics2D) g;
         switch (type) {
             case PLAYER -> drawCharacter(g2d, SOLDIER_IMAGE, localPlayer ? new Color(105, 255, 145) : new Color(90, 180, 255));
@@ -79,6 +105,65 @@ public final class NetworkReplica extends GameObject {
             case EFFECT -> drawEffect(g2d);
             default -> {
             }
+        }
+    }
+
+    private GameObject createBaseRenderer() {
+        return switch (type) {
+            case PLAYER -> {
+                Protagonist player = new Protagonist(x, y, new GameKeyController(), localPlayer);
+                player.setControlsEnabled(false);
+                yield player;
+            }
+            case SOLDIER -> new Soldat(x, y, Weapon.fromName(detail));
+            case ENEMY -> {
+                EnemyArchetype[] archetypes = EnemyArchetype.values();
+                int index = Math.max(0, Math.min(archetypes.length - 1, variant - 1));
+                yield new Ennemi(x, y, archetypes[index], Weapon.fromName(detail));
+            }
+            case ALIEN -> new Alien(x, y);
+            case CIVILIAN -> new Homme(x, y);
+            case PROJECTILE -> {
+                ProjectileType[] projectileTypes = ProjectileType.values();
+                int index = Math.max(0, Math.min(projectileTypes.length - 1, variant - 1));
+                yield new Projectile(x, y, vx, vy, null, projectileTypes[index]);
+            }
+            case AMMO_DEPOT -> new AmmoDepot(x, y);
+            case DEATH_MARKER -> new DeathMarker(createMarkerVictim());
+            case TURRET -> new DesertTurret(x, y);
+            case PICKUP -> switch (variant) {
+                case 1 -> new DroppedAmmo(x, y, Weapon.fromName(detail), amount);
+                case 2 -> new DroppedWeapon(x, y, Weapon.fromName(detail));
+                case 3 -> new DroppedArmor(x, y);
+                default -> null;
+            };
+            default -> null;
+        };
+    }
+
+    private Homme createMarkerVictim() {
+        return switch (variant) {
+            case 1 -> new Soldat(x, y, Weapon.fromName(detail));
+            case 2 -> new Ennemi(x, y);
+            case 3 -> new Alien(x, y);
+            default -> new Homme(x, y);
+        };
+    }
+
+    private void syncBaseRenderer() {
+        if (baseRenderer == null) return;
+        baseRenderer.x = x;
+        baseRenderer.y = y;
+        baseRenderer.vx = vx;
+        baseRenderer.vy = vy;
+        if (baseRenderer instanceof Protagonist player) {
+            player.applyNetworkPose(facingX, facingY, detail);
+        } else if (baseRenderer instanceof Soldat soldier) {
+            soldier.applyNetworkPose(facingX, facingY);
+        } else if (baseRenderer instanceof Ennemi enemy) {
+            enemy.applyNetworkPose(facingX, facingY);
+        } else if (baseRenderer instanceof DesertTurret turret) {
+            turret.applyNetworkPose(facingX, facingY);
         }
     }
 

@@ -8,7 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class WorldSnapshot {
+    public static final class TileMutation {
+        public int row;
+        public int col;
+        public int tileId;
+        public int damage;
+    }
+
     public static final class Entity {
+        public long id;
         public byte type;
         public byte variant;
         public double x;
@@ -22,8 +30,6 @@ public final class WorldSnapshot {
         public int amount;
     }
 
-    public int mapType;
-    public int gameMode;
     public int screenState;
     public int score;
     public double playerX;
@@ -38,11 +44,10 @@ public final class WorldSnapshot {
     public boolean reloading;
     public double reloadProgress;
     public long[] soundCounters = new long[Utils.SOUND_COUNT];
+    public final List<TileMutation> tileMutations = new ArrayList<>();
     public final List<Entity> entities = new ArrayList<>();
 
     public void write(DataOutputStream output) throws IOException {
-        output.writeInt(mapType);
-        output.writeInt(gameMode);
         output.writeInt(screenState);
         output.writeInt(score);
         output.writeDouble(playerX);
@@ -57,8 +62,16 @@ public final class WorldSnapshot {
         output.writeBoolean(reloading);
         output.writeDouble(reloadProgress);
         for (int i = 0; i < Utils.SOUND_COUNT; i++) output.writeLong(soundCounters[i]);
+        output.writeInt(tileMutations.size());
+        for (TileMutation mutation : tileMutations) {
+            output.writeInt(mutation.row);
+            output.writeInt(mutation.col);
+            output.writeInt(mutation.tileId);
+            output.writeInt(mutation.damage);
+        }
         output.writeInt(entities.size());
         for (Entity entity : entities) {
+            output.writeLong(entity.id);
             output.writeByte(entity.type);
             output.writeByte(entity.variant);
             output.writeDouble(entity.x);
@@ -75,8 +88,6 @@ public final class WorldSnapshot {
 
     public static WorldSnapshot read(DataInputStream input) throws IOException {
         WorldSnapshot snapshot = new WorldSnapshot();
-        snapshot.mapType = input.readInt();
-        snapshot.gameMode = input.readInt();
         snapshot.screenState = input.readInt();
         snapshot.score = input.readInt();
         snapshot.playerX = input.readDouble();
@@ -91,10 +102,21 @@ public final class WorldSnapshot {
         snapshot.reloading = input.readBoolean();
         snapshot.reloadProgress = input.readDouble();
         for (int i = 0; i < Utils.SOUND_COUNT; i++) snapshot.soundCounters[i] = input.readLong();
+        int mutationCount = input.readInt();
+        if (mutationCount < 0 || mutationCount > 10_000) throw new IOException("mutations de carte invalides");
+        for (int i = 0; i < mutationCount; i++) {
+            TileMutation mutation = new TileMutation();
+            mutation.row = input.readInt();
+            mutation.col = input.readInt();
+            mutation.tileId = input.readInt();
+            mutation.damage = input.readInt();
+            snapshot.tileMutations.add(mutation);
+        }
         int count = input.readInt();
         if (count < 0 || count > 10_000) throw new IOException("instantane invalide");
         for (int i = 0; i < count; i++) {
             Entity entity = new Entity();
+            entity.id = input.readLong();
             entity.type = input.readByte();
             entity.variant = input.readByte();
             entity.x = input.readDouble();

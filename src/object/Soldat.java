@@ -65,8 +65,12 @@ public class Soldat extends Homme {
     }
 
     public Soldat(double x, double y) {
+        this(x, y, pickSoldierWeapon());
+    }
+
+    public Soldat(double x, double y, Weapon networkWeapon) {
         super(x, y);
-        carriedWeapon = pickSoldierWeapon();
+        carriedWeapon = networkWeapon == null ? pickSoldierWeapon() : networkWeapon;
         vx = (Math.random() - 0.5) * 3; // Soldats plus rapides que les civils
         vy = (Math.random() - 0.5) * 3;
     }
@@ -572,5 +576,10 @@ public class Soldat extends Homme {
 
     public Weapon getCarriedWeapon() {
         return carriedWeapon;
+    }
+
+    public void applyNetworkPose(double networkFacingX, double networkFacingY) {
+        facingX = networkFacingX;
+        facingY = networkFacingY;
     }
 }

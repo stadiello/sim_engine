@@ -92,6 +92,11 @@ public final class DesertTurret extends GameObject {
         return facingY;
     }
 
+    public void applyNetworkPose(double networkFacingX, double networkFacingY) {
+        facingX = networkFacingX;
+        facingY = networkFacingY;
+    }
+
     private void releaseOperator() {
         if (operator != null) operator.setControlsEnabled(true);
         operator = null;

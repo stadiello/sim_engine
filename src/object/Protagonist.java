@@ -400,6 +400,19 @@ public class Protagonist extends Homme{
         return facingY;
     }
 
+    public void applyNetworkPose(double networkFacingX, double networkFacingY, String weaponName) {
+        facingX = networkFacingX;
+        facingY = networkFacingY;
+        for (int i = 0; i < loadout.size(); i++) {
+            if (loadout.get(i).getName().equals(weaponName)) {
+                selectedWeaponIndex = i;
+                return;
+            }
+        }
+        loadout.add(Weapon.fromName(weaponName));
+        selectedWeaponIndex = loadout.size() - 1;
+    }
+
     public Weapon getCurrentWeapon() {
         if (loadout.isEmpty()) {
             return null;

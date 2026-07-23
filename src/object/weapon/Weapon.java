@@ -207,6 +207,21 @@ public final class Weapon {
         return TESLA_CANNON.copy();
     }
 
+    public static Weapon fromName(String name) {
+        if (name == null) return glock();
+        return switch (name) {
+            case "Blaster" -> blaster();
+            case "Carabine" -> carabine();
+            case "Glock" -> glock();
+            case "Shotgun" -> shotgun();
+            case "Grenade" -> grenade();
+            case "Minigun" -> minigun();
+            case "Lance-roquettes" -> rocketLauncher();
+            case "Canon Tesla" -> teslaCannon();
+            default -> glock();
+        };
+    }
+
     public static Weapon[] protagonistLoadout() {
         return new Weapon[]{blaster(), carabine(), glock(), shotgun(), grenade(), minigun(), rocketLauncher(), teslaCannon()};
     }

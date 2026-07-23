@@ -30,6 +30,7 @@ public class TileManager {
     Tile[] tiles;
     int[][] map;
     int[][] tileDamage;
+    int[][] baseMap;
     private double cameraX;
     private double cameraY;
     private final ThreadLocal<int[]> renderCameraOverride = new ThreadLocal<>();
@@ -109,7 +110,33 @@ public class TileManager {
             case NIGHT_BLACKOUT -> buildNightBlackoutMapData();
         };
 
+        baseMap = copyMap(map);
         tileDamage = new int[map.length][map[0].length];
+    }
+
+    private int[][] copyMap(int[][] source) {
+        int[][] copy = new int[source.length][];
+        for (int row = 0; row < source.length; row++) copy[row] = source[row].clone();
+        return copy;
+    }
+
+    public java.util.List<int[]> getNetworkTileMutations() {
+        java.util.ArrayList<int[]> mutations = new java.util.ArrayList<>();
+        for (int row = 0; row < map.length; row++) {
+            for (int col = 0; col < map[row].length; col++) {
+                if (map[row][col] != baseMap[row][col] || tileDamage[row][col] > 0) {
+                    mutations.add(new int[]{row, col, map[row][col], tileDamage[row][col]});
+                }
+            }
+        }
+        return mutations;
+    }
+
+    public void applyNetworkTileMutation(int row, int col, int tileId, int damage) {
+        if (row < 0 || row >= map.length || col < 0 || col >= map[row].length) return;
+        if (tileId < 0 || tileId >= tiles.length) return;
+        map[row][col] = tileId;
+        tileDamage[row][col] = Math.max(0, damage);
     }
 
     private int[][] buildCityMapData() {

@@ -61,10 +61,14 @@ public class Ennemi extends Homme {
     }
 
     public Ennemi(double x, double y, EnemyArchetype archetype) {
+        this(x, y, archetype, null);
+    }
+
+    public Ennemi(double x, double y, EnemyArchetype archetype, Weapon networkWeapon) {
         super(x, y);
         this.brain = new BotBrain();
         this.archetype = archetype;
-        this.carriedWeapon = pickWeaponForArchetype(archetype);
+        this.carriedWeapon = networkWeapon == null ? pickWeaponForArchetype(archetype) : networkWeapon;
         this.vx = 0;
         this.vy = 0;
     }
@@ -182,6 +186,11 @@ public class Ennemi extends Homme {
 
     public double getFacingY() {
         return facingY;
+    }
+
+    public void applyNetworkPose(double networkFacingX, double networkFacingY) {
+        facingX = networkFacingX;
+        facingY = networkFacingY;
     }
 
     public Weapon getCarriedWeapon() {
