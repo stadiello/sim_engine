@@ -195,21 +195,6 @@ public class GamePanel extends JPanel implements Runnable {
         ObjectManager.list.clear();
     }
 
-    public int getNetworkMapType() {
-        return tileManager.getCurrentMapType().ordinal();
-    }
-
-    public int getNetworkGameMode() {
-        return GameMode.current.ordinal();
-    }
-
-    public void configureNetworkWorld(int mapType, int gameMode) {
-        MapType[] maps = MapType.values();
-        if (mapType >= 0 && mapType < maps.length) tileManager.setCurrentMapType(maps[mapType]);
-        GameMode[] modes = GameMode.values();
-        if (gameMode >= 0 && gameMode < modes.length) GameMode.current = modes[gameMode];
-    }
-
     public void setNetworkConnectionStatus(String status) {
         networkConnectionStatus = status == null ? "" : status;
         repaint();
@@ -224,6 +209,35 @@ public class GamePanel extends JPanel implements Runnable {
         if (snapshot == null) return;
         applyNetworkSounds(snapshot);
         networkSnapshot = snapshot;
+        MapType[] maps = MapType.values();
+        if (snapshot.mapType >= 0 && snapshot.mapType < maps.length) {
+            tileManager.setCurrentMapType(maps[snapshot.mapType]);
+        }
+        GameMode[] modes = GameMode.values();
+        if (snapshot.gameMode >= 0 && snapshot.gameMode < modes.length) {
+            GameMode.current = modes[snapshot.gameMode];
+        }
+        DifficultyProfile[] difficulties = DifficultyProfile.values();
+        if (snapshot.difficulty >= 0 && snapshot.difficulty < difficulties.length) {
+            currentDifficulty = difficulties[snapshot.difficulty];
+        }
+        nombreCivil = snapshot.civilianCount;
+        nombreEnnemi = snapshot.enemyCount;
+        nombreAlien = snapshot.alienCount;
+        nombreSoldat = snapshot.soldierCount;
+        AiTuning.applyNetworkSettings(
+                snapshot.enemyReactionFrames,
+                snapshot.soldierReactionFrames,
+                snapshot.enemyAimFrames,
+                snapshot.soldierAimFrames,
+                snapshot.suppressionFrames,
+                snapshot.suppressionCoverBoost,
+                snapshot.suppressionRadius,
+                snapshot.alienPackAggro
+        );
+        unlimitedAmmoEnabled = snapshot.unlimitedAmmo;
+        fireCameraFeedbackEnabled = snapshot.fireCameraFeedback;
+        deathMarkersEnabled = snapshot.deathMarkers;
         ScreenState[] states = ScreenState.values();
         if (snapshot.screenState >= 0 && snapshot.screenState < states.length) {
             screenState = states[snapshot.screenState];
@@ -273,6 +287,24 @@ public class GamePanel extends JPanel implements Runnable {
     public WorldSnapshot createSnapshotForRemote() {
         WorldSnapshot snapshot = new WorldSnapshot();
         snapshot.screenState = screenState.ordinal();
+        snapshot.mapType = tileManager.getCurrentMapType().ordinal();
+        snapshot.gameMode = GameMode.current.ordinal();
+        snapshot.difficulty = currentDifficulty.ordinal();
+        snapshot.civilianCount = nombreCivil;
+        snapshot.enemyCount = nombreEnnemi;
+        snapshot.alienCount = nombreAlien;
+        snapshot.soldierCount = nombreSoldat;
+        snapshot.enemyReactionFrames = AiTuning.getEnemyReactionFrames();
+        snapshot.soldierReactionFrames = AiTuning.getSoldierReactionFrames();
+        snapshot.enemyAimFrames = AiTuning.getEnemyAimStabilizationFrames();
+        snapshot.soldierAimFrames = AiTuning.getSoldierAimStabilizationFrames();
+        snapshot.suppressionFrames = AiTuning.getSuppressionDurationFrames();
+        snapshot.suppressionCoverBoost = AiTuning.getSuppressionCoverBoost();
+        snapshot.suppressionRadius = AiTuning.getSuppressionNearMissRadius();
+        snapshot.alienPackAggro = AiTuning.isAlienPackAggroEnabled();
+        snapshot.unlimitedAmmo = unlimitedAmmoEnabled;
+        snapshot.fireCameraFeedback = fireCameraFeedbackEnabled;
+        snapshot.deathMarkers = deathMarkersEnabled;
         snapshot.score = score;
         snapshot.soundCounters = Utils.getSoundCounters();
         for (int[] tile : tileManager.getNetworkTileMutations()) {
@@ -1401,6 +1433,9 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private void handleMenuInput() {
+        if (networkReplicaView) {
+            return;
+        }
         if (screenState == ScreenState.PLAYING && !paused) {
             return;
         }
@@ -1424,8 +1459,8 @@ public class GamePanel extends JPanel implements Runnable {
             if (handleMapSelectionClick(mouseX, mouseY)) {
                 return;
             }
-
-            if (handleDifficultySelectionClick(mouseX, mouseY)) {
+            // TODO: Modification à la main de la position de la selection de la diff mais pas très propre, à corriger plus tard
+            if (handleDifficultySelectionClick(mouseX, mouseY-100)) {
                 return;
             }
 
@@ -2308,7 +2343,7 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawString(title, (panelWidth - fm.stringWidth(title)) / 2, 88);
 
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 18f));
-        String mapTitle = "Choisis ta carte";
+        String mapTitle = networkReplicaView ? "Carte choisie par l'hote" : "Choisis ta carte";
         FontMetrics mapFm = g2d.getFontMetrics();
         g2d.drawString(mapTitle, (panelWidth - mapFm.stringWidth(mapTitle)) / 2, 118);
 
@@ -2339,7 +2374,7 @@ public class GamePanel extends JPanel implements Runnable {
         String difficultyTitle = "Difficulte";
         FontMetrics diffTitleMetrics = g2d.getFontMetrics();
         g2d.setColor(new Color(238, 238, 238));
-        g2d.drawString(difficultyTitle, (panelWidth - diffTitleMetrics.stringWidth(difficultyTitle)) / 2, 272);
+        g2d.drawString(difficultyTitle, (panelWidth - diffTitleMetrics.stringWidth(difficultyTitle)) / 2, 372);
         drawDifficultyButton(g2d, getDifficultyButtonBounds(0), DifficultyProfile.EASY);
         drawDifficultyButton(g2d, getDifficultyButtonBounds(1), DifficultyProfile.NORMAL);
         drawDifficultyButton(g2d, getDifficultyButtonBounds(2), DifficultyProfile.CUSTOM);
@@ -2353,7 +2388,9 @@ public class GamePanel extends JPanel implements Runnable {
         drawButton(g2d, getOptionsButtonBounds(), "Options");
 
         g2d.setFont(oldFont.deriveFont(Font.PLAIN, 16f));
-        String hint = "Clique sur une carte puis sur un mode";
+        String hint = networkReplicaView
+                ? "Configuration controlee par l'hote"
+                : "Clique sur une carte puis sur un mode";
         FontMetrics hintFm = g2d.getFontMetrics();
         g2d.drawString(hint, (panelWidth - hintFm.stringWidth(hint)) / 2, panelHeight - 26);
         g2d.setFont(oldFont);
@@ -2362,17 +2399,17 @@ public class GamePanel extends JPanel implements Runnable {
     private void drawDifficultyButton(Graphics2D g2d, Rectangle rect, DifficultyProfile profile) {
         boolean selected = currentDifficulty == profile;
         g2d.setColor(selected ? new Color(180, 132, 54, 220) : new Color(32, 32, 32, 218));
-        g2d.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 11, 11);
+        g2d.fillRoundRect(rect.x, rect.y+100, rect.width, rect.height, 11, 11);
         g2d.setColor(selected ? new Color(255, 226, 148) : new Color(214, 214, 214));
         g2d.setStroke(new BasicStroke(selected ? 2.4f : 1.6f));
-        g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 11, 11);
+        g2d.drawRoundRect(rect.x, rect.y+100, rect.width, rect.height, 11, 11);
 
         Font oldFont = g2d.getFont();
         g2d.setFont(oldFont.deriveFont(Font.BOLD, 15f));
         FontMetrics fm = g2d.getFontMetrics();
         String label = profile.getLabel();
         int textX = rect.x + (rect.width - fm.stringWidth(label)) / 2;
-        int textY = rect.y + (rect.height - fm.getHeight()) / 2 + fm.getAscent();
+        int textY = rect.y + 100 + (rect.height - fm.getHeight()) / 2 + fm.getAscent();
         g2d.drawString(label, textX, textY);
         g2d.setFont(oldFont);
     }

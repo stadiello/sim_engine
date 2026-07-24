@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class LanHost implements AutoCloseable {
     public static final int DEFAULT_PORT = 28765;
-    private static final String MAGIC = "SIM_ENGINE_LAN_5";
+    private static final String MAGIC = "SIM_ENGINE_LAN_6";
     private final GamePanel panel;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean();
@@ -79,8 +79,6 @@ public final class LanHost implements AutoCloseable {
                 throw new IOException("client incompatible");
             }
             output.writeUTF(MAGIC);
-            output.writeInt(panel.getNetworkMapType());
-            output.writeInt(panel.getNetworkGameMode());
             output.flush();
             status = "Joueur 2 connecte : " + socket.getInetAddress().getHostAddress();
             panel.onRemotePlayerConnected(remoteInput);

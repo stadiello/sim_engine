@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 
 public final class LanClientViewer extends GamePanel implements Runnable {
-    private static final String MAGIC = "SIM_ENGINE_LAN_5";
+    private static final String MAGIC = "SIM_ENGINE_LAN_6";
     private final String host;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean(true);
@@ -40,9 +40,6 @@ public final class LanClientViewer extends GamePanel implements Runnable {
             output.writeUTF(MAGIC);
             output.flush();
             if (!MAGIC.equals(input.readUTF())) throw new IOException("hote incompatible");
-            int mapType = input.readInt();
-            int gameMode = input.readInt();
-            SwingUtilities.invokeAndWait(() -> configureNetworkWorld(mapType, gameMode));
             setNetworkConnectionStatus("Connecte a " + host + " - synchronisation...");
 
             Thread sender = new Thread(() -> sendInputs(output), "lan-client-input");
@@ -55,8 +52,6 @@ public final class LanClientViewer extends GamePanel implements Runnable {
             }
         } catch (IOException e) {
             showNetworkConnectionError("Connexion impossible/perdue : " + e.getMessage());
-        } catch (Exception e) {
-            showNetworkConnectionError("Initialisation impossible : " + e.getMessage());
         }
     }
 

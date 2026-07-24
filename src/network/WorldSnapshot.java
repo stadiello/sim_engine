@@ -32,6 +32,24 @@ public final class WorldSnapshot {
     }
 
     public int screenState;
+    public int mapType;
+    public int gameMode;
+    public int difficulty;
+    public int civilianCount;
+    public int enemyCount;
+    public int alienCount;
+    public int soldierCount;
+    public int enemyReactionFrames;
+    public int soldierReactionFrames;
+    public int enemyAimFrames;
+    public int soldierAimFrames;
+    public int suppressionFrames;
+    public double suppressionCoverBoost;
+    public double suppressionRadius;
+    public boolean alienPackAggro;
+    public boolean unlimitedAmmo;
+    public boolean fireCameraFeedback;
+    public boolean deathMarkers;
     public int score;
     public double playerX;
     public double playerY;
@@ -50,6 +68,24 @@ public final class WorldSnapshot {
 
     public void write(DataOutputStream output) throws IOException {
         output.writeInt(screenState);
+        output.writeInt(mapType);
+        output.writeInt(gameMode);
+        output.writeInt(difficulty);
+        output.writeInt(civilianCount);
+        output.writeInt(enemyCount);
+        output.writeInt(alienCount);
+        output.writeInt(soldierCount);
+        output.writeInt(enemyReactionFrames);
+        output.writeInt(soldierReactionFrames);
+        output.writeInt(enemyAimFrames);
+        output.writeInt(soldierAimFrames);
+        output.writeInt(suppressionFrames);
+        output.writeDouble(suppressionCoverBoost);
+        output.writeDouble(suppressionRadius);
+        output.writeBoolean(alienPackAggro);
+        output.writeBoolean(unlimitedAmmo);
+        output.writeBoolean(fireCameraFeedback);
+        output.writeBoolean(deathMarkers);
         output.writeInt(score);
         output.writeDouble(playerX);
         output.writeDouble(playerY);
@@ -92,6 +128,24 @@ public final class WorldSnapshot {
     public static WorldSnapshot read(DataInputStream input) throws IOException {
         WorldSnapshot snapshot = new WorldSnapshot();
         snapshot.screenState = input.readInt();
+        snapshot.mapType = input.readInt();
+        snapshot.gameMode = input.readInt();
+        snapshot.difficulty = input.readInt();
+        snapshot.civilianCount = input.readInt();
+        snapshot.enemyCount = input.readInt();
+        snapshot.alienCount = input.readInt();
+        snapshot.soldierCount = input.readInt();
+        snapshot.enemyReactionFrames = input.readInt();
+        snapshot.soldierReactionFrames = input.readInt();
+        snapshot.enemyAimFrames = input.readInt();
+        snapshot.soldierAimFrames = input.readInt();
+        snapshot.suppressionFrames = input.readInt();
+        snapshot.suppressionCoverBoost = input.readDouble();
+        snapshot.suppressionRadius = input.readDouble();
+        snapshot.alienPackAggro = input.readBoolean();
+        snapshot.unlimitedAmmo = input.readBoolean();
+        snapshot.fireCameraFeedback = input.readBoolean();
+        snapshot.deathMarkers = input.readBoolean();
         snapshot.score = input.readInt();
         snapshot.playerX = input.readDouble();
         snapshot.playerY = input.readDouble();

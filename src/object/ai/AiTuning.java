@@ -109,6 +109,26 @@ public final class AiTuning {
         alienPackAggroEnabled = false;
     }
 
+    public static void applyNetworkSettings(
+            int enemyReaction,
+            int soldierReaction,
+            int enemyAim,
+            int soldierAim,
+            int suppressionDuration,
+            double coverBoost,
+            double nearMissRadius,
+            boolean packAggro
+    ) {
+        enemyReactionFrames = clampInt(enemyReaction, 2, 40);
+        soldierReactionFrames = clampInt(soldierReaction, 2, 40);
+        enemyAimStabilizationFrames = clampInt(enemyAim, 0, 30);
+        soldierAimStabilizationFrames = clampInt(soldierAim, 0, 30);
+        suppressionDurationFrames = clampInt(suppressionDuration, 20, 220);
+        suppressionCoverBoost = clampDouble(coverBoost, 0.0, 2.0);
+        suppressionNearMissRadius = clampDouble(nearMissRadius, 30.0, 180.0);
+        alienPackAggroEnabled = packAggro;
+    }
+
     private static int clampInt(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }
