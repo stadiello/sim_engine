@@ -2,7 +2,7 @@ package object;
 
 import java.awt.*;
 
-public class ImpactSpark extends GameObject {
+public class ImpactSpark extends GameObject implements NetworkVisualState {
 
     private static final int PARTICLE_COUNT = 8;
     private static final int MAX_LIFETIME = 12;
@@ -11,9 +11,9 @@ public class ImpactSpark extends GameObject {
     private final double[] py = new double[PARTICLE_COUNT];
     private final double[] pvx = new double[PARTICLE_COUNT];
     private final double[] pvy = new double[PARTICLE_COUNT];
-    private final Color coreColor;
-    private final Color emberColor;
-    private final double particleScale;
+    private Color coreColor;
+    private Color emberColor;
+    private double particleScale;
     private int lifetime = MAX_LIFETIME;
 
     public ImpactSpark(double x, double y) {
@@ -74,6 +74,39 @@ public class ImpactSpark extends GameObject {
         }
 
         g2d.setComposite(oldComposite);
+    }
+
+    @Override
+    public double[] getNetworkVisualState() {
+        double[] state = new double[4 + PARTICLE_COUNT * 4];
+        state[0] = lifetime;
+        state[1] = particleScale;
+        state[2] = coreColor.getRGB();
+        state[3] = emberColor.getRGB();
+        int offset = 4;
+        for (int i = 0; i < PARTICLE_COUNT; i++) {
+            state[offset++] = px[i];
+            state[offset++] = py[i];
+            state[offset++] = pvx[i];
+            state[offset++] = pvy[i];
+        }
+        return state;
+    }
+
+    @Override
+    public void applyNetworkVisualState(double[] state) {
+        if (state == null || state.length != 4 + PARTICLE_COUNT * 4) return;
+        lifetime = Math.max(0, Math.min(MAX_LIFETIME, (int) Math.round(state[0])));
+        particleScale = Math.max(0.1, state[1]);
+        coreColor = new Color((int) state[2], true);
+        emberColor = new Color((int) state[3], true);
+        int offset = 4;
+        for (int i = 0; i < PARTICLE_COUNT; i++) {
+            px[i] = state[offset++];
+            py[i] = state[offset++];
+            pvx[i] = state[offset++];
+            pvy[i] = state[offset++];
+        }
     }
     
 }

@@ -19,7 +19,7 @@ import world.TileManager;
  * Décharge instantanée qui accroche une cible dans l'axe, puis saute vers les
  * hostiles voisins. L'entité reste quelques frames uniquement pour le rendu.
  */
-public final class TeslaArc extends GameObject {
+public final class TeslaArc extends GameObject implements NetworkVisualState {
     private static final double PRIMARY_RANGE = 520.0;
     private static final double PRIMARY_LOCK_WIDTH = 78.0;
     private static final double CHAIN_RANGE = 220.0;
@@ -52,6 +52,15 @@ public final class TeslaArc extends GameObject {
             eliminate(current);
             current = findChainTarget(current.x, current.y, shooter, struck);
         }
+    }
+
+    private TeslaArc(double originX, double originY) {
+        super(originX, originY);
+        points.add(new double[]{originX, originY});
+    }
+
+    public static TeslaArc createNetworkReplica(double originX, double originY) {
+        return new TeslaArc(originX, originY);
     }
 
     private Homme findPrimaryTarget(double originX, double originY, double dirX, double dirY, Homme shooter) {
@@ -148,6 +157,32 @@ public final class TeslaArc extends GameObject {
         g2d.setComposite(oldComposite);
         if (oldAntialias != null) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAntialias);
+        }
+    }
+
+    @Override
+    public double[] getNetworkVisualState() {
+        double[] state = new double[2 + points.size() * 2];
+        state[0] = lifetime;
+        state[1] = points.size();
+        int offset = 2;
+        for (double[] point : points) {
+            state[offset++] = point[0];
+            state[offset++] = point[1];
+        }
+        return state;
+    }
+
+    @Override
+    public void applyNetworkVisualState(double[] state) {
+        if (state == null || state.length < 4) return;
+        int pointCount = (int) Math.round(state[1]);
+        if (pointCount < 2 || state.length != 2 + pointCount * 2) return;
+        lifetime = Math.max(0, Math.min(MAX_LIFETIME, (int) Math.round(state[0])));
+        points.clear();
+        int offset = 2;
+        for (int i = 0; i < pointCount; i++) {
+            points.add(new double[]{state[offset++], state[offset++]});
         }
     }
 

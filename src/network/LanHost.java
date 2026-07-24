@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class LanHost implements AutoCloseable {
     public static final int DEFAULT_PORT = 28765;
-    private static final String MAGIC = "SIM_ENGINE_LAN_4";
+    private static final String MAGIC = "SIM_ENGINE_LAN_5";
     private final GamePanel panel;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean();

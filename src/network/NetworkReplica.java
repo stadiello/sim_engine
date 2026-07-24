@@ -47,6 +47,7 @@ public final class NetworkReplica extends GameObject {
     private boolean localPlayer;
     private String detail;
     private int amount;
+    private double[] visualState = new double[0];
     private final GameObject baseRenderer;
 
     public NetworkReplica(WorldSnapshot.Entity entity) {
@@ -72,6 +73,7 @@ public final class NetworkReplica extends GameObject {
         localPlayer = entity.localPlayer;
         detail = entity.detail == null ? "" : entity.detail;
         amount = entity.amount;
+        visualState = entity.visualState == null ? new double[0] : entity.visualState;
         syncBaseRenderer();
     }
 
@@ -137,6 +139,11 @@ public final class NetworkReplica extends GameObject {
                 case 3 -> new DroppedArmor(x, y);
                 default -> null;
             };
+            case EFFECT -> switch (variant) {
+                case 1 -> new ImpactSpark(x, y);
+                case 4 -> TeslaArc.createNetworkReplica(x, y);
+                default -> null;
+            };
             default -> null;
         };
     }
@@ -156,6 +163,9 @@ public final class NetworkReplica extends GameObject {
         baseRenderer.y = y;
         baseRenderer.vx = vx;
         baseRenderer.vy = vy;
+        if (baseRenderer instanceof NetworkVisualState visual) {
+            visual.applyNetworkVisualState(visualState);
+        }
         if (baseRenderer instanceof Protagonist player) {
             player.applyNetworkPose(facingX, facingY, detail);
         } else if (baseRenderer instanceof Soldat soldier) {

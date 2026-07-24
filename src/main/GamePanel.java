@@ -44,6 +44,7 @@ import object.Douille;
 import object.Shockwave;
 import object.Soldat;
 import object.ObjectManager;
+import object.NetworkVisualState;
 import world.TileManager;
 import world.TileManager.MapType;
 
@@ -316,6 +317,9 @@ public class GamePanel extends JPanel implements Runnable {
         entity.y = object.y;
         entity.vx = object.vx;
         entity.vy = object.vy;
+        if (object instanceof NetworkVisualState visual) {
+            entity.visualState = visual.getNetworkVisualState();
+        }
         if (object instanceof Protagonist player) {
             entity.type = NetworkReplica.PLAYER;
             entity.facingX = player.getFacingX();

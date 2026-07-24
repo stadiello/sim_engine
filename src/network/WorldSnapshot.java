@@ -28,6 +28,7 @@ public final class WorldSnapshot {
         public boolean localPlayer;
         public String detail = "";
         public int amount;
+        public double[] visualState = new double[0];
     }
 
     public int screenState;
@@ -83,6 +84,8 @@ public final class WorldSnapshot {
             output.writeBoolean(entity.localPlayer);
             output.writeUTF(entity.detail);
             output.writeInt(entity.amount);
+            output.writeInt(entity.visualState.length);
+            for (double value : entity.visualState) output.writeDouble(value);
         }
     }
 
@@ -128,6 +131,14 @@ public final class WorldSnapshot {
             entity.localPlayer = input.readBoolean();
             entity.detail = input.readUTF();
             entity.amount = input.readInt();
+            int visualStateLength = input.readInt();
+            if (visualStateLength < 0 || visualStateLength > 1_024) {
+                throw new IOException("etat visuel invalide");
+            }
+            entity.visualState = new double[visualStateLength];
+            for (int value = 0; value < visualStateLength; value++) {
+                entity.visualState[value] = input.readDouble();
+            }
             snapshot.entities.add(entity);
         }
         return snapshot;
