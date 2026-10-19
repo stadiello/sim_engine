@@ -125,7 +125,6 @@ public class GamePanel extends JPanel implements Runnable {
     private volatile RemotePlayerInput remotePlayerInput;
     private volatile Protagonist remoteProtagonist;
     private volatile LanHost lanHost;
-    private final ThreadLocal<Protagonist> renderedPlayerOverride = new ThreadLocal<>();
     private volatile WorldSnapshot networkSnapshot;
     private volatile boolean networkReplicaView;
     private volatile String networkConnectionStatus = "Connexion a l'hote...";
@@ -284,7 +283,14 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
-    public WorldSnapshot createSnapshotForRemote() {
+    private void publishRemoteSnapshot() {
+        LanHost host = lanHost;
+        if (host != null && host.hasClient()) {
+            host.publishSnapshot(createSnapshotForRemote());
+        }
+    }
+
+    private WorldSnapshot createSnapshotForRemote() {
         WorldSnapshot snapshot = new WorldSnapshot();
         snapshot.screenState = screenState.ordinal();
         snapshot.mapType = tileManager.getCurrentMapType().ordinal();
@@ -1179,7 +1185,13 @@ public class GamePanel extends JPanel implements Runnable {
                 updates++;
             }
 
+            // Apres un blocage (GC, fenetre deplacee...), on abandonne le retard au lieu d'accelerer le jeu.
+            if (accumulator >= NANOS_PER_UPDATE) {
+                accumulator = NANOS_PER_UPDATE - 1;
+            }
+
             handleMenuInput();
+            publishRemoteSnapshot();
 
             repaint();
 
@@ -1736,8 +1748,7 @@ public class GamePanel extends JPanel implements Runnable {
     }
 
     private Protagonist getRenderedPlayer() {
-        Protagonist override = renderedPlayerOverride.get();
-        return override != null ? override : ObjectManager.getProtagonist();
+        return ObjectManager.getProtagonist();
     }
 
     private int getViewWidth() {
@@ -2601,42 +2612,6 @@ public class GamePanel extends JPanel implements Runnable {
         g2d.drawString(networkConnectionStatus,
                 (getViewWidth() - metrics.stringWidth(networkConnectionStatus)) / 2,
                 getViewHeight() / 2);
-    }
-
-    public BufferedImage captureFrame() {
-        int width = Math.max(1, getViewWidth());
-        int height = Math.max(1, getViewHeight());
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = image.createGraphics();
-        try {
-            paint(graphics);
-        } finally {
-            graphics.dispose();
-        }
-        return image;
-    }
-
-    public BufferedImage captureRemoteFrame() {
-        Protagonist remote = remoteProtagonist;
-        if (remote == null) return captureFrame();
-
-        int[] camera = tileManager.calculateCameraFor(remote.x, remote.y, getViewWidth(), getViewHeight());
-        tileManager.setRenderCameraOverride(camera[0], camera[1]);
-        renderedPlayerOverride.set(remote);
-        try {
-            return captureFrame();
-        } finally {
-            renderedPlayerOverride.remove();
-            tileManager.clearRenderCameraOverride();
-        }
-    }
-
-    public void paintScore(Graphics g, int scoreHit) {
-        super.paintComponent(g);
-        g.setColor(Color.RED);
-        g.fillRect(0, 0, getWidth(), getHeight());
-        g.setColor(Color.WHITE);
-        g.drawString("Score: " + score, 10, 20);
     }
 
     public static void triggerScreenShake(int frames, double amplitude) {

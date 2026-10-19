@@ -13,10 +13,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class LanHost implements AutoCloseable {
     public static final int DEFAULT_PORT = 28765;
-    private static final String MAGIC = "SIM_ENGINE_LAN_6";
+    // Change a chaque modification du format des messages pour refuser les versions incompatibles.
+    public static final String PROTOCOL_MAGIC = "SIM_ENGINE_LAN_7";
+    private static final long SNAPSHOT_WAIT_MILLIS = 100;
     private final GamePanel panel;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean();
+    private final Object snapshotLock = new Object();
+    private WorldSnapshot latestSnapshot;
     private volatile ServerSocket serverSocket;
     private volatile Socket clientSocket;
     private volatile String status = "Hote LAN en attente";
@@ -36,6 +40,28 @@ public final class LanHost implements AutoCloseable {
 
     public String getStatus() {
         return status + " - " + localAddress + ":" + port;
+    }
+
+    public boolean hasClient() {
+        return clientSocket != null;
+    }
+
+    // Appele par le thread de jeu : l'instantane est construit entre deux pas de simulation,
+    // le thread reseau se contente de le serialiser.
+    public void publishSnapshot(WorldSnapshot snapshot) {
+        synchronized (snapshotLock) {
+            latestSnapshot = snapshot;
+            snapshotLock.notifyAll();
+        }
+    }
+
+    private WorldSnapshot awaitNextSnapshot(WorldSnapshot lastSent) throws InterruptedException {
+        synchronized (snapshotLock) {
+            while (latestSnapshot == lastSent && running.get()) {
+                snapshotLock.wait(SNAPSHOT_WAIT_MILLIS);
+            }
+            return latestSnapshot;
+        }
     }
 
     private static String findLocalAddress() {
@@ -60,9 +86,7 @@ public final class LanHost implements AutoCloseable {
             while (running.get()) {
                 Socket socket = server.accept();
                 socket.setTcpNoDelay(true);
-                clientSocket = socket;
                 handleClient(socket);
-                clientSocket = null;
                 if (running.get()) status = "Joueur 2 deconnecte - nouvelle attente";
             }
         } catch (IOException e) {
@@ -75,28 +99,36 @@ public final class LanHost implements AutoCloseable {
         try {
             DataInputStream input = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
             DataOutputStream output = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-            if (!MAGIC.equals(input.readUTF())) {
+            if (!PROTOCOL_MAGIC.equals(input.readUTF())) {
                 throw new IOException("client incompatible");
             }
-            output.writeUTF(MAGIC);
+            output.writeUTF(PROTOCOL_MAGIC);
             output.flush();
             status = "Joueur 2 connecte : " + socket.getInetAddress().getHostAddress();
             panel.onRemotePlayerConnected(remoteInput);
+            synchronized (snapshotLock) {
+                latestSnapshot = null;
+            }
+            clientSocket = socket;
 
             Thread receiver = new Thread(() -> receiveInputs(input, remoteInput), "lan-host-input");
             receiver.setDaemon(true);
             receiver.start();
 
+            WorldSnapshot lastSent = null;
             while (running.get() && !socket.isClosed()) {
-                panel.createSnapshotForRemote().write(output);
+                WorldSnapshot snapshot = awaitNextSnapshot(lastSent);
+                if (snapshot == null || snapshot == lastSent) continue;
+                snapshot.write(output);
                 output.flush();
-                Thread.sleep(16);
+                lastSent = snapshot;
             }
         } catch (IOException e) {
             if (running.get()) status = "Connexion perdue";
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
+            clientSocket = null;
             panel.onRemotePlayerDisconnected();
             try { socket.close(); } catch (IOException ignored) {}
         }
@@ -114,7 +146,8 @@ public final class LanHost implements AutoCloseable {
             }
         } catch (IOException ignored) {
             try {
-                if (clientSocket != null) clientSocket.close();
+                Socket socket = clientSocket;
+                if (socket != null) socket.close();
             } catch (IOException ignoredAgain) {}
         }
     }
@@ -122,6 +155,9 @@ public final class LanHost implements AutoCloseable {
     @Override
     public void close() {
         running.set(false);
+        synchronized (snapshotLock) {
+            snapshotLock.notifyAll();
+        }
         try { if (clientSocket != null) clientSocket.close(); } catch (IOException ignored) {}
         try { if (serverSocket != null) serverSocket.close(); } catch (IOException ignored) {}
     }

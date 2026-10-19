@@ -8,13 +8,15 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 
 public final class LanClientViewer extends GamePanel implements Runnable {
-    private static final String MAGIC = "SIM_ENGINE_LAN_6";
     private final String host;
     private final int port;
     private final AtomicBoolean running = new AtomicBoolean(true);
+    // Seul le dernier instantane recu compte : si l'EDT prend du retard, les anciens sont ignores.
+    private final AtomicReference<WorldSnapshot> pendingSnapshot = new AtomicReference<>();
     private volatile Socket socket;
 
     public LanClientViewer(String host, int port) {
@@ -37,9 +39,9 @@ public final class LanClientViewer extends GamePanel implements Runnable {
             connected.setTcpNoDelay(true);
             DataOutputStream output = new DataOutputStream(new BufferedOutputStream(connected.getOutputStream()));
             DataInputStream input = new DataInputStream(new BufferedInputStream(connected.getInputStream()));
-            output.writeUTF(MAGIC);
+            output.writeUTF(LanHost.PROTOCOL_MAGIC);
             output.flush();
-            if (!MAGIC.equals(input.readUTF())) throw new IOException("hote incompatible");
+            if (!LanHost.PROTOCOL_MAGIC.equals(input.readUTF())) throw new IOException("hote incompatible");
             setNetworkConnectionStatus("Connecte a " + host + " - synchronisation...");
 
             Thread sender = new Thread(() -> sendInputs(output), "lan-client-input");
@@ -48,11 +50,18 @@ public final class LanClientViewer extends GamePanel implements Runnable {
 
             while (running.get()) {
                 WorldSnapshot snapshot = WorldSnapshot.read(input);
-                SwingUtilities.invokeLater(() -> applyNetworkSnapshot(snapshot));
+                if (pendingSnapshot.getAndSet(snapshot) == null) {
+                    SwingUtilities.invokeLater(this::applyPendingSnapshot);
+                }
             }
         } catch (IOException e) {
             showNetworkConnectionError("Connexion impossible/perdue : " + e.getMessage());
         }
+    }
+
+    private void applyPendingSnapshot() {
+        WorldSnapshot snapshot = pendingSnapshot.getAndSet(null);
+        if (snapshot != null) applyNetworkSnapshot(snapshot);
     }
 
     private void sendInputs(DataOutputStream output) {

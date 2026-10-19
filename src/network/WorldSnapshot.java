@@ -106,22 +106,23 @@ public final class WorldSnapshot {
             output.writeInt(mutation.tileId);
             output.writeInt(mutation.damage);
         }
+        // Les entites sont envoyees en float : la precision suffit pour l'affichage et divise leur taille par deux.
         output.writeInt(entities.size());
         for (Entity entity : entities) {
             output.writeLong(entity.id);
             output.writeByte(entity.type);
             output.writeByte(entity.variant);
-            output.writeDouble(entity.x);
-            output.writeDouble(entity.y);
-            output.writeDouble(entity.vx);
-            output.writeDouble(entity.vy);
-            output.writeDouble(entity.facingX);
-            output.writeDouble(entity.facingY);
+            output.writeFloat((float) entity.x);
+            output.writeFloat((float) entity.y);
+            output.writeFloat((float) entity.vx);
+            output.writeFloat((float) entity.vy);
+            output.writeFloat((float) entity.facingX);
+            output.writeFloat((float) entity.facingY);
             output.writeBoolean(entity.localPlayer);
             output.writeUTF(entity.detail);
             output.writeInt(entity.amount);
             output.writeInt(entity.visualState.length);
-            for (double value : entity.visualState) output.writeDouble(value);
+            for (double value : entity.visualState) output.writeFloat((float) value);
         }
     }
 
@@ -176,12 +177,12 @@ public final class WorldSnapshot {
             entity.id = input.readLong();
             entity.type = input.readByte();
             entity.variant = input.readByte();
-            entity.x = input.readDouble();
-            entity.y = input.readDouble();
-            entity.vx = input.readDouble();
-            entity.vy = input.readDouble();
-            entity.facingX = input.readDouble();
-            entity.facingY = input.readDouble();
+            entity.x = input.readFloat();
+            entity.y = input.readFloat();
+            entity.vx = input.readFloat();
+            entity.vy = input.readFloat();
+            entity.facingX = input.readFloat();
+            entity.facingY = input.readFloat();
             entity.localPlayer = input.readBoolean();
             entity.detail = input.readUTF();
             entity.amount = input.readInt();
@@ -191,7 +192,7 @@ public final class WorldSnapshot {
             }
             entity.visualState = new double[visualStateLength];
             for (int value = 0; value < visualStateLength; value++) {
-                entity.visualState[value] = input.readDouble();
+                entity.visualState[value] = input.readFloat();
             }
             snapshot.entities.add(entity);
         }

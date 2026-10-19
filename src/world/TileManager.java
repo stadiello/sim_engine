@@ -31,9 +31,10 @@ public class TileManager {
     int[][] map;
     int[][] tileDamage;
     int[][] baseMap;
+    // Liste des tuiles modifiees, recalculee seulement quand la carte change (et non a chaque instantane reseau).
+    private java.util.List<int[]> networkTileMutations;
     private double cameraX;
     private double cameraY;
-    private final ThreadLocal<int[]> renderCameraOverride = new ThreadLocal<>();
     private MapType currentMapType = MapType.CITY;
 
     public TileManager(GamePanel gp) {
@@ -112,6 +113,7 @@ public class TileManager {
 
         baseMap = copyMap(map);
         tileDamage = new int[map.length][map[0].length];
+        networkTileMutations = null;
     }
 
     private int[][] copyMap(int[][] source) {
@@ -121,6 +123,13 @@ public class TileManager {
     }
 
     public java.util.List<int[]> getNetworkTileMutations() {
+        if (networkTileMutations == null) {
+            networkTileMutations = java.util.Collections.unmodifiableList(computeNetworkTileMutations());
+        }
+        return networkTileMutations;
+    }
+
+    private java.util.List<int[]> computeNetworkTileMutations() {
         java.util.ArrayList<int[]> mutations = new java.util.ArrayList<>();
         for (int row = 0; row < map.length; row++) {
             for (int col = 0; col < map[row].length; col++) {
@@ -137,6 +146,7 @@ public class TileManager {
         if (tileId < 0 || tileId >= tiles.length) return;
         map[row][col] = tileId;
         tileDamage[row][col] = Math.max(0, damage);
+        networkTileMutations = null;
     }
 
     private int[][] buildCityMapData() {
@@ -736,6 +746,7 @@ public class TileManager {
         }
 
         tileDamage[row][col] += damage;
+        networkTileMutations = null;
         if (tileDamage[row][col] < tile.hitPoints) {
             return false;
         }
@@ -812,23 +823,11 @@ public class TileManager {
         return new int[]{centeredX, centeredY};
     }
 
-    public void setRenderCameraOverride(int cameraX, int cameraY) {
-        renderCameraOverride.set(new int[]{cameraX, cameraY});
-    }
-
-    public void clearRenderCameraOverride() {
-        renderCameraOverride.remove();
-    }
-
     public int getCameraX() {
-        int[] override = renderCameraOverride.get();
-        if (override != null) return override[0];
         return (int) Math.round(cameraX);
     }
 
     public int getCameraY() {
-        int[] override = renderCameraOverride.get();
-        if (override != null) return override[1];
         return (int) Math.round(cameraY);
     }
 

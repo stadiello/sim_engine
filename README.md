@@ -15,6 +15,15 @@ Petit jeu 2D ecrit en Java.
 - `compile.bash` : compile et lance le jeu
 - `factor.bash` : build complet + package app macOS
 
+## Tests
+
+```bash
+bash test.bash
+```
+
+Compile le jeu et lance les tests du dossier `test/` (dont l'aller-retour
+`WorldSnapshot.write/read` du protocole LAN).
+
 ## Lancer le jeu en local
 
 ```bash

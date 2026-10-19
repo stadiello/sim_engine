@@ -7,18 +7,21 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GameKeyController implements PlayerInput, KeyEventDispatcher, MouseMotionListener, MouseListener, MouseWheelListener {
     
-    private boolean up, down, left, right;
-    private boolean sprint;
+    // Ecrits par l'EDT, lus par le thread de jeu et le thread reseau du client.
+    private volatile boolean up, down, left, right;
+    private volatile boolean sprint;
     private volatile boolean leftClickPressed;
-    private volatile boolean leftClickTriggered;
-    private volatile boolean rightClickTriggered;
-    private volatile boolean pauseToggleTriggered;
-    private volatile boolean interactTriggered;
-    private volatile boolean reloadTriggered;
+    // Evenements ponctuels : getAndSet(false) evite de perdre un appui arrive entre la lecture et la remise a zero.
+    private final AtomicBoolean leftClickTriggered = new AtomicBoolean();
+    private final AtomicBoolean rightClickTriggered = new AtomicBoolean();
+    private final AtomicBoolean pauseToggleTriggered = new AtomicBoolean();
+    private final AtomicBoolean interactTriggered = new AtomicBoolean();
+    private final AtomicBoolean reloadTriggered = new AtomicBoolean();
     private boolean pauseKeyPressed;
     private boolean interactKeyPressed;
     private boolean reloadKeyPressed;
@@ -48,7 +51,7 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
             case KeyEvent.VK_P -> {
                 if (pressed) {
                     if (!pauseKeyPressed) {
-                        pauseToggleTriggered = true;
+                        pauseToggleTriggered.set(true);
                     }
                     pauseKeyPressed = true;
                 } else {
@@ -58,7 +61,7 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
             case KeyEvent.VK_E -> {
                 if (pressed) {
                     if (!interactKeyPressed) {
-                        interactTriggered = true;
+                        interactTriggered.set(true);
                     }
                     interactKeyPressed = true;
                 } else {
@@ -68,7 +71,7 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
             case KeyEvent.VK_R -> {
                 if (pressed) {
                     if (!reloadKeyPressed) {
-                        reloadTriggered = true;
+                        reloadTriggered.set(true);
                     }
                     reloadKeyPressed = true;
                 } else {
@@ -85,33 +88,13 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
     public boolean isRight() { return right; }
     public boolean isSprint() { return sprint; }
     public boolean isLeftClickPressed() { return leftClickPressed; }
-    public boolean consumeLeftClickPressed() {
-        boolean wasTriggered = leftClickTriggered;
-        leftClickTriggered = false;
-        return wasTriggered;
-    }
-    public boolean consumeRightClickTriggered() {
-        boolean wasTriggered = rightClickTriggered;
-        rightClickTriggered = false;
-        return wasTriggered;
-    }
+    public boolean consumeLeftClickPressed() { return leftClickTriggered.getAndSet(false); }
+    public boolean consumeRightClickTriggered() { return rightClickTriggered.getAndSet(false); }
     public int getRightClickX() { return rightClickX; }
     public int getRightClickY() { return rightClickY; }
-    public boolean consumePauseToggleTriggered() {
-        boolean wasTriggered = pauseToggleTriggered;
-        pauseToggleTriggered = false;
-        return wasTriggered;
-    }
-    public boolean consumeInteractTriggered() {
-        boolean wasTriggered = interactTriggered;
-        interactTriggered = false;
-        return wasTriggered;
-    }
-    public boolean consumeReloadTriggered() {
-        boolean wasTriggered = reloadTriggered;
-        reloadTriggered = false;
-        return wasTriggered;
-    }
+    public boolean consumePauseToggleTriggered() { return pauseToggleTriggered.getAndSet(false); }
+    public boolean consumeInteractTriggered() { return interactTriggered.getAndSet(false); }
+    public boolean consumeReloadTriggered() { return reloadTriggered.getAndSet(false); }
     public int consumeWeaponScrollDelta() { return weaponScrollDelta.getAndSet(0); }
 
     public int getMouseX() { return mouseX; }
@@ -133,11 +116,11 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
     public void mousePressed(MouseEvent e) {
         if (e.getButton() == MouseEvent.BUTTON1) {
             leftClickPressed = true;
-            leftClickTriggered = true;
+            leftClickTriggered.set(true);
         } else if (e.getButton() == MouseEvent.BUTTON3 || e.isPopupTrigger()) {
             rightClickX = e.getX();
             rightClickY = e.getY();
-            rightClickTriggered = true;
+            rightClickTriggered.set(true);
         }
     }
 
@@ -148,7 +131,7 @@ public class GameKeyController implements PlayerInput, KeyEventDispatcher, Mouse
         } else if (e.getButton() == MouseEvent.BUTTON3 || e.isPopupTrigger()) {
             rightClickX = e.getX();
             rightClickY = e.getY();
-            rightClickTriggered = true;
+            rightClickTriggered.set(true);
         }
     }
 
