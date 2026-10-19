@@ -1,5 +1,6 @@
 rm -rf out dist release
-rm -f manifest.txt sources.txt
+# zip -r met a jour une archive existante : on la supprime pour ne pas garder les fichiers d'un ancien build.
+rm -f manifest.txt sources.txt SimEngine.zip
 
 find . -name "*.class" -delete
 mkdir -p out/assets
