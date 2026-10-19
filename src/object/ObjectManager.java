@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
+import main.GameSession;
 import object.ai.TacticalMovement;
 import world.TileManager;
 
@@ -14,6 +15,8 @@ public class ObjectManager {
     public static final ManagedObjectList list = new ManagedObjectList();
     private static final Object LOCK = new Object();
     private static TileManager tileManager;
+    // Session de la partie (mode, score, options) ; une valeur par defaut evite les tests de nullite.
+    private static GameSession session = new GameSession();
     private static final ArrayList<Homme> livingHumans = new ArrayList<>();
     private static final ArrayList<Homme> alliedTargets = new ArrayList<>();
     private static final ArrayList<Homme> soldierHostiles = new ArrayList<>();
@@ -37,6 +40,14 @@ public class ObjectManager {
 
     public static TileManager getTileManager() {
         return tileManager;
+    }
+
+    public static void setSession(GameSession current) {
+        session = current;
+    }
+
+    public static GameSession getSession() {
+        return session;
     }
 
     public static boolean isHumanAreaFree(double x, double y, double radius, GameObject... ignoredObjects) {

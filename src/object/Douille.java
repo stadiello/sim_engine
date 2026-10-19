@@ -5,6 +5,8 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.io.IOException;
 import javax.imageio.ImageIO;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Douille extends GameObject {
 
@@ -88,5 +90,12 @@ public class Douille extends GameObject {
         g2d.rotate(angle, x, y);
         g2d.drawImage(imgDouille, (int) x - 4, (int) y - 2, 8, 4, null);
         g2d.setTransform(old);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 6;
+        return true;
     }
 }

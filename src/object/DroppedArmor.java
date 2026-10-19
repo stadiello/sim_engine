@@ -6,6 +6,8 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class DroppedArmor extends GameObject {
 
@@ -86,5 +88,13 @@ public class DroppedArmor extends GameObject {
         FontMetrics fm = g2d.getFontMetrics();
         String label = "Gilet";
         g2d.drawString(label, (int) x - fm.stringWidth(label) / 2, (int) y + 22);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.PICKUP;
+        entity.variant = 3;
+        entity.detail = "Gilet";
+        return true;
     }
 }

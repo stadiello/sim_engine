@@ -7,7 +7,6 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import main.GameMode;
-import main.GamePanel;
 import main.Utils;
 import object.Douille;
 import object.Ennemi;
@@ -327,7 +326,7 @@ public final class Weapon {
     }
 
     public int getCooldownFrames() {
-        if (GameMode.current != GameMode.ARCADE) {
+        if (!ObjectManager.getSession().isMode(GameMode.ARCADE)) {
             return cooldownFrames;
         }
 
@@ -341,7 +340,7 @@ public final class Weapon {
     }
 
     public double getProjectileSpeed() {
-        return GameMode.current == GameMode.ARCADE && projectileType != Projectile.ProjectileType.GRENADE
+        return ObjectManager.getSession().isMode(GameMode.ARCADE) && projectileType != Projectile.ProjectileType.GRENADE
                 ? projectileSpeed * 1.06
                 : projectileSpeed;
     }
@@ -395,7 +394,7 @@ public final class Weapon {
     }
 
     public boolean canReload() {
-        if (GamePanel.isUnlimitedAmmoEnabled()) {
+        if (ObjectManager.getSession().isUnlimitedAmmoEnabled()) {
             return false;
         }
         return ammoInMagazine < magazineCapacity && reserveAmmo > 0;
@@ -492,7 +491,7 @@ public final class Weapon {
         }
 
         boolean usesAmmo = shooter instanceof Protagonist || shooter instanceof Ennemi;
-        if (usesAmmo && !GamePanel.isUnlimitedAmmoEnabled()) {
+        if (usesAmmo && !ObjectManager.getSession().isUnlimitedAmmoEnabled()) {
             if (ammoInMagazine <= 0) {
                 return false;
             }
@@ -504,7 +503,7 @@ public final class Weapon {
         double projectileSpeedValue = getProjectileSpeed();
         double[] muzzleOrigin = getMuzzleOrigin(originX, originY, dirX, dirY);
 
-        if (GamePanel.isFireCameraFeedbackEnabled()) {
+        if (ObjectManager.getSession().isFireCameraFeedbackEnabled()) {
             triggerFireFeedback();
         }
 
@@ -551,7 +550,7 @@ public final class Weapon {
             return;
         }
 
-        double recoilScale = GameMode.current == GameMode.ARCADE ? 1.35 : 1.0;
+        double recoilScale = ObjectManager.getSession().isMode(GameMode.ARCADE) ? 1.35 : 1.0;
         int offsetArme = shot ? (int) (Math.sin(timer * 0.15) * recoilAmplitude * recoilScale) : 0;
         if (sprite != null) {
             g2d.drawImage(sprite, (int) x + drawOffsetX, (int) y + drawOffsetY + offsetArme, drawWidth, drawHeight, null);
@@ -600,32 +599,32 @@ public final class Weapon {
 
     private void triggerFireFeedback() {
         if (projectileType == Projectile.ProjectileType.TESLA) {
-            GamePanel.triggerScreenShake(8, 4.2);
-            GamePanel.triggerScreenFlash(new Color(105, 215, 255), 0.18f, 7);
+            ObjectManager.getSession().triggerScreenShake(8, 4.2);
+            ObjectManager.getSession().triggerScreenFlash(new Color(105, 215, 255), 0.18f, 7);
             return;
         }
         if (projectileType == Projectile.ProjectileType.GRENADE) {
-            GamePanel.triggerScreenShake(10, 5.0);
-            GamePanel.triggerScreenFlash(new Color(255, 226, 180), 0.12f, 5);
+            ObjectManager.getSession().triggerScreenShake(10, 5.0);
+            ObjectManager.getSession().triggerScreenFlash(new Color(255, 226, 180), 0.12f, 5);
             return;
         }
 
-        double shakeScale = GameMode.current == GameMode.ARCADE ? 1.0 : 0.7;
-        float flashScale = GameMode.current == GameMode.ARCADE ? 1.0f : 0.65f;
+        double shakeScale = ObjectManager.getSession().isMode(GameMode.ARCADE) ? 1.0 : 0.7;
+        float flashScale = ObjectManager.getSession().isMode(GameMode.ARCADE) ? 1.0f : 0.65f;
 
         if (isShotgun()) {
-            GamePanel.triggerScreenShake(6, 3.0 * shakeScale);
-            GamePanel.triggerScreenFlash(new Color(255, 232, 190), 0.08f * flashScale, 4);
+            ObjectManager.getSession().triggerScreenShake(6, 3.0 * shakeScale);
+            ObjectManager.getSession().triggerScreenFlash(new Color(255, 232, 190), 0.08f * flashScale, 4);
             return;
         }
         if (isAutomatic()) {
-            GamePanel.triggerScreenShake(3, 1.2 * shakeScale);
-            GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.03f * flashScale, 2);
+            ObjectManager.getSession().triggerScreenShake(3, 1.2 * shakeScale);
+            ObjectManager.getSession().triggerScreenFlash(new Color(255, 241, 210), 0.03f * flashScale, 2);
             return;
         }
 
-        GamePanel.triggerScreenShake(2, 0.9 * shakeScale);
-        GamePanel.triggerScreenFlash(new Color(255, 241, 210), 0.02f * flashScale, 2);
+        ObjectManager.getSession().triggerScreenShake(2, 0.9 * shakeScale);
+        ObjectManager.getSession().triggerScreenFlash(new Color(255, 241, 210), 0.02f * flashScale, 2);
     }
 
     private double[] getMuzzleOrigin(double originX, double originY, double dirX, double dirY) {

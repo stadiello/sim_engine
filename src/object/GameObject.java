@@ -2,6 +2,7 @@ package object;
 
 import java.awt.Graphics;
 
+import network.WorldSnapshot;
 import world.TileManager;
 
 public abstract class GameObject {
@@ -18,6 +19,15 @@ public abstract class GameObject {
     public abstract void draw(Graphics g);
 
     public void onDeath() {}
+
+    /**
+     * Remplit la description reseau de l'objet (type, variante, details) envoyee au client LAN.
+     * Position, vitesse, identifiant et etat visuel sont deja renseignes par l'appelant.
+     * viewer est le joueur distant (peut etre null). Renvoie false si l'objet n'est pas replique.
+     */
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        return false;
+    }
 
     protected boolean canMoveTo(double nextX, double nextY, double radius) {
         TileManager tileManager = ObjectManager.getTileManager();

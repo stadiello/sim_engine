@@ -7,8 +7,8 @@ import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
-
-import main.GamePanel;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 /** Silhouette persistante au sol indiquant le type et la faction d'un mort. */
 public final class DeathMarker extends GameObject {
@@ -49,7 +49,7 @@ public final class DeathMarker extends GameObject {
 
     @Override
     public void draw(Graphics g) {
-        if (!GamePanel.areDeathMarkersEnabled()) return;
+        if (!ObjectManager.getSession().areDeathMarkersEnabled()) return;
 
         Graphics2D g2d = (Graphics2D) g;
         AffineTransform oldTransform = g2d.getTransform();
@@ -168,5 +168,18 @@ public final class DeathMarker extends GameObject {
         g2d.setColor(new Color(220, 187, 255));
         g2d.fillOval((int) x - 7, (int) y - 3, 4, 4);
         g2d.fillOval((int) x + 3, (int) y - 3, 4, 4);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.DEATH_MARKER;
+        entity.variant = (byte) getNetworkVariant();
+        if (entity.variant == 1 && viewer != null) {
+            // Indique au client s'il est assez proche pour relever cet allie.
+            double dx = viewer.x - x;
+            double dy = viewer.y - y;
+            entity.amount = dx * dx + dy * dy <= 68.0 * 68.0 ? 1 : 0;
+        }
+        return true;
     }
 }

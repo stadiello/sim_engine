@@ -8,6 +8,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 
 import object.weapon.Weapon;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class DroppedAmmo extends GameObject {
 
@@ -69,5 +71,14 @@ public class DroppedAmmo extends GameObject {
         FontMetrics fm = g2d.getFontMetrics();
         String label = "+" + reserveAmmo + " " + weapon.getName();
         g2d.drawString(label, (int) x - fm.stringWidth(label) / 2, (int) y + 22);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.PICKUP;
+        entity.variant = 1;
+        entity.detail = getWeapon().getName();
+        entity.amount = getReserveAmmo();
+        return true;
     }
 }

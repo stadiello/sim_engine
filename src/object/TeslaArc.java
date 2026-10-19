@@ -11,9 +11,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
-import main.GamePanel;
 import object.ai.TacticalMovement;
 import world.TileManager;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 /**
  * Décharge instantanée qui accroche une cible dans l'axe, puis saute vers les
@@ -128,7 +129,7 @@ public final class TeslaArc extends GameObject implements NetworkVisualState {
                 target.x, target.y, 0, -1, 2.2,
                 new Color(225, 255, 255), new Color(66, 154, 255)
         ));
-        GamePanel.score += 15;
+        ObjectManager.getSession().addScore(15);
     }
 
     @Override
@@ -239,5 +240,12 @@ public final class TeslaArc extends GameObject implements NetworkVisualState {
         g2d.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2d.setColor(Color.WHITE);
         g2d.drawPolyline(xs, ys, xs.length);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 4;
+        return true;
     }
 }

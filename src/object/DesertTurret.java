@@ -10,6 +10,8 @@ import java.awt.geom.AffineTransform;
 
 import gameController.PlayerInput;
 import object.weapon.Weapon;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 /** Tourelle alliée fixe réservée à la position fortifiée du Désert tactique. */
 public final class DesertTurret extends GameObject {
@@ -170,5 +172,13 @@ public final class DesertTurret extends GameObject {
             if (dx * dx + dy * dy <= USE_RADIUS * USE_RADIUS) return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.TURRET;
+        entity.facingX = getFacingX();
+        entity.facingY = getFacingY();
+        return true;
     }
 }

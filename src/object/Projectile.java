@@ -4,11 +4,12 @@ import java.awt.*;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
-import main.GamePanel;
 import main.GameMode;
 import main.Utils;
 import object.ai.AiTuning;
 import world.TileManager;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Projectile extends GameObject {
 
@@ -102,8 +103,8 @@ public class Projectile extends GameObject {
             }
             ObjectManager.list.remove(this);
             ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.0, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
-            if (GameMode.current == main.GameMode.ARCADE) {
-                GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.025f, 2);
+            if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+                ObjectManager.getSession().triggerScreenFlash(METAL_IMPACT_CORE, 0.025f, 2);
             }
             return;
         }
@@ -145,9 +146,9 @@ public class Projectile extends GameObject {
             if (distSq < hitRadiusSq) {
                 if (homme instanceof Protagonist protagonist && protagonist.consumeArmorPlateOnHit()) {
                     ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.15, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
-                    if (GameMode.current == main.GameMode.ARCADE) {
-                        GamePanel.triggerScreenShake(4, 1.6);
-                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.045f, 3);
+                    if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+                        ObjectManager.getSession().triggerScreenShake(4, 1.6);
+                        ObjectManager.getSession().triggerScreenFlash(METAL_IMPACT_CORE, 0.045f, 3);
                     }
                     ObjectManager.list.remove(this);
                     return;
@@ -155,9 +156,9 @@ public class Projectile extends GameObject {
 
                 if (homme instanceof Soldat soldat && soldat.consumeArmorPlateOnHit()) {
                     ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.10, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
-                    if (GameMode.current == main.GameMode.ARCADE) {
-                        GamePanel.triggerScreenShake(3, 1.4);
-                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.04f, 2);
+                    if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+                        ObjectManager.getSession().triggerScreenShake(3, 1.4);
+                        ObjectManager.getSession().triggerScreenFlash(METAL_IMPACT_CORE, 0.04f, 2);
                     }
                     ObjectManager.list.remove(this);
                     return;
@@ -165,9 +166,9 @@ public class Projectile extends GameObject {
 
                 if (homme instanceof Ennemi ennemi && ennemi.absorbFrontHit(vx, vy)) {
                     ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.2, METAL_IMPACT_CORE, METAL_IMPACT_EMBER));
-                    if (GameMode.current == main.GameMode.ARCADE) {
-                        GamePanel.triggerScreenShake(4, 1.8);
-                        GamePanel.triggerScreenFlash(METAL_IMPACT_CORE, 0.05f, 3);
+                    if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+                        ObjectManager.getSession().triggerScreenShake(4, 1.8);
+                        ObjectManager.getSession().triggerScreenFlash(METAL_IMPACT_CORE, 0.05f, 3);
                     }
                     ObjectManager.list.remove(this);
                     return;
@@ -180,12 +181,12 @@ public class Projectile extends GameObject {
                 ObjectManager.list.remove(homme);
                 homme.onDeath();
                 ObjectManager.list.add(new ImpactSpark(x, y, vx, vy, 1.5, FLESH_IMPACT_CORE, FLESH_IMPACT_EMBER));
-                if (GameMode.current == main.GameMode.ARCADE) {
-                    GamePanel.triggerScreenShake(5, 2.3);
-                    GamePanel.triggerScreenFlash(FLESH_IMPACT_EMBER, 0.06f, 3);
+                if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+                    ObjectManager.getSession().triggerScreenShake(5, 2.3);
+                    ObjectManager.getSession().triggerScreenFlash(FLESH_IMPACT_EMBER, 0.06f, 3);
                 }
                 ObjectManager.list.remove(this);
-                GamePanel.score += 10;
+                ObjectManager.getSession().addScore(10);
                 return;
             }
         }
@@ -298,9 +299,9 @@ public class Projectile extends GameObject {
         }
 
         ObjectManager.list.add(new Shockwave(x, y, tireur, GRENADE_BLAST_RADIUS));
-        if (GameMode.current == main.GameMode.ARCADE) {
-            GamePanel.triggerScreenShake(14, 7.0);
-            GamePanel.triggerScreenFlash(new Color(255, 176, 110), 0.22f, 8);
+        if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
+            ObjectManager.getSession().triggerScreenShake(14, 7.0);
+            ObjectManager.getSession().triggerScreenFlash(new Color(255, 176, 110), 0.22f, 8);
         }
 
         ObjectManager.list.remove(this);
@@ -328,8 +329,8 @@ public class Projectile extends GameObject {
                 ObjectManager.list.add(new RocketBlastCloud(x, y, ROCKET_BLAST_RADIUS));
         ObjectManager.list.add(new Shockwave(x, y, tireur, ROCKET_BLAST_RADIUS));
         ObjectManager.list.add(new Shockwave(x, y, tireur, ROCKET_BLAST_RADIUS * 0.62));
-        GamePanel.triggerScreenShake(18, 8.5);
-        GamePanel.triggerScreenFlash(new Color(255, 152, 86), 0.28f, 10);
+        ObjectManager.getSession().triggerScreenShake(18, 8.5);
+        ObjectManager.getSession().triggerScreenFlash(new Color(255, 152, 86), 0.28f, 10);
         ObjectManager.list.remove(this);
     }
 
@@ -418,5 +419,11 @@ public class Projectile extends GameObject {
         double dy = py - closestY;
         return dx * dx + dy * dy;
     }
-    
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.PROJECTILE;
+        entity.variant = (byte) (getProjectileType().ordinal() + 1);
+        return true;
+    }
 }

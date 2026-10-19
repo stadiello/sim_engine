@@ -5,6 +5,8 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 
 import object.ai.AiTuning;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Homme extends GameObject {
 
@@ -129,4 +131,9 @@ public class Homme extends GameObject {
         ObjectManager.list.add(new DeathMarker(this));
     }
 
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.CIVILIAN;
+        return true;
+    }
 }

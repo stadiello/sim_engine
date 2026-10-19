@@ -7,8 +7,8 @@ import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.util.ArrayList;
-
-import main.GamePanel;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Shockwave extends GameObject {
 
@@ -50,7 +50,7 @@ public class Shockwave extends GameObject {
         for (Homme victim : victims) {
             ObjectManager.list.remove(victim);
             victim.onDeath();
-            GamePanel.score += 10;
+            ObjectManager.getSession().addScore(10);
         }
 
         if (radius >= maxRadius) {
@@ -76,5 +76,12 @@ public class Shockwave extends GameObject {
 
         g2d.setComposite(oldComposite);
         g2d.setStroke(oldStroke);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 3;
+        return true;
     }
 }
