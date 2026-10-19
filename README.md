@@ -98,7 +98,7 @@ bash factor.bash
 
 Ce script :
 
-- nettoie `out/`, `dist/` et `release/`
+- nettoie `out/`, `dist/`, `release/` et l'ancien `SimEngine.zip`
 - compile tous les fichiers Java
 - cree `dist/sim_engine.jar`
 - genere `release/SimEngine.app` via `jpackage`
