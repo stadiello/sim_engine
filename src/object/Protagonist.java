@@ -11,6 +11,8 @@ import object.ai.TacticalMovement;
 import object.weapon.Weapon;
 import world.TileManager;
 import java.util.ArrayList;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Protagonist extends Homme{
 
@@ -99,9 +101,9 @@ public class Protagonist extends Homme{
     }
 
     private static boolean isMissionStyleMode() {
-        return GameMode.current == GameMode.STORY
-                || GameMode.current == GameMode.PROTECTION
-                || GameMode.current == GameMode.MISSION;
+        return ObjectManager.getSession().isMode(GameMode.STORY)
+                || ObjectManager.getSession().isMode(GameMode.PROTECTION)
+                || ObjectManager.getSession().isMode(GameMode.MISSION);
     }
 
     private Weapon findMatchingWeapon(Weapon weapon) {
@@ -289,7 +291,7 @@ public class Protagonist extends Homme{
         tickReload();
 
         double moveSpeed = MOVE_SPEED * getSuppressionMoveMultiplier();
-        if (GameMode.current == GameMode.ARCADE) {
+        if (ObjectManager.getSession().isMode(GameMode.ARCADE)) {
             moveSpeed *= ARCADE_MOVE_SPEED_MULTIPLIER;
         }
         if (keyController.isSprint()) {
@@ -438,4 +440,13 @@ public class Protagonist extends Homme{
         return 1.0 - Math.max(0.0, Math.min(1.0, reloadTimer / (double) reloadFrames));
     }
 
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.PLAYER;
+        entity.facingX = getFacingX();
+        entity.facingY = getFacingY();
+        entity.localPlayer = this == viewer;
+        if (getCurrentWeapon() != null) entity.detail = getCurrentWeapon().getName();
+        return true;
+    }
 }

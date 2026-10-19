@@ -5,6 +5,8 @@ import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class RocketBlastCloud extends GameObject {
 
@@ -64,5 +66,12 @@ public class RocketBlastCloud extends GameObject {
         }
 
         g2d.setComposite(oldComposite);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 2;
+        return true;
     }
 }

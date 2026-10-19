@@ -1,6 +1,8 @@
 package object;
 
 import java.awt.*;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class ImpactSpark extends GameObject implements NetworkVisualState {
 
@@ -108,5 +110,11 @@ public class ImpactSpark extends GameObject implements NetworkVisualState {
             pvy[i] = state[offset++];
         }
     }
-    
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 1;
+        return true;
+    }
 }

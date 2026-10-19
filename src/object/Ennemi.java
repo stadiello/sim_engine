@@ -10,6 +10,8 @@ import javax.imageio.ImageIO;
 import object.ai.BotBrain;
 import object.weapon.Weapon;
 import main.GameMode;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Ennemi extends Homme {
 
@@ -95,25 +97,25 @@ public class Ennemi extends Homme {
     @Override
     public void onDeath() {
         super.onDeath();
-        if (GameMode.current == GameMode.STORY || GameMode.current == GameMode.MISSION) {
+        if (ObjectManager.getSession().isMode(GameMode.STORY) || ObjectManager.getSession().isMode(GameMode.MISSION)) {
             int droppedMagAmmo = Math.max(0, Math.min(
                 carriedWeapon.getMagazineCapacity(),
                 carriedWeapon.getMagazineCapacity() / 2 + (int) (Math.random() * (carriedWeapon.getMagazineCapacity() / 2.0 + 1))
             ));
-            int droppedReserveAmmo = GameMode.current == GameMode.MISSION
+            int droppedReserveAmmo = ObjectManager.getSession().isMode(GameMode.MISSION)
                 ? carriedWeapon.getMagazineCapacity() * (1 + (int) (Math.random() * 2))
                 : carriedWeapon.getMagazineCapacity();
             ObjectManager.list.add(new DroppedWeapon(x, y, carriedWeapon.withAmmo(droppedMagAmmo, droppedReserveAmmo)));
         }
 
-        if (GameMode.current == GameMode.MISSION) {
+        if (ObjectManager.getSession().isMode(GameMode.MISSION)) {
             int looseAmmo = Math.max(4, carriedWeapon.getMagazineCapacity() / 2 + (int) (Math.random() * Math.max(4, carriedWeapon.getMagazineCapacity())));
             ObjectManager.list.add(new DroppedAmmo(x + 12 - Math.random() * 24, y + 10 - Math.random() * 20, carriedWeapon, looseAmmo));
         }
 
-        double armorDropChance = GameMode.current == GameMode.ARCADE
+        double armorDropChance = ObjectManager.getSession().isMode(GameMode.ARCADE)
                 ? 0.28
-                : GameMode.current == GameMode.PROTECTION ? 0.22 : 0.16;
+                : ObjectManager.getSession().isMode(GameMode.PROTECTION) ? 0.22 : 0.16;
         if (Math.random() < armorDropChance) {
             ObjectManager.list.add(new DroppedArmor(x, y));
         }
@@ -299,5 +301,15 @@ public class Ennemi extends Homme {
 
         carriedWeapon.draw(g2d, x, y, shotAnimTimer, shotAnimTimer > 0);
         g2d.setTransform(old);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.ENEMY;
+        entity.variant = (byte) (getArchetype().ordinal() + 1);
+        entity.facingX = getFacingX();
+        entity.facingY = getFacingY();
+        entity.detail = getCarriedWeapon().getName();
+        return true;
     }
 }

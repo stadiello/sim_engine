@@ -10,6 +10,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 /** Caisse permanente qui recharge les réserves, avec un délai propre à chaque joueur. */
 public final class AmmoDepot extends GameObject {
@@ -74,5 +76,12 @@ public final class AmmoDepot extends GameObject {
         String label = "DEPOT MUNITIONS";
         g2d.drawString(label, (int) x - metrics.stringWidth(label) / 2, (int) y + 28);
         g2d.setStroke(oldStroke);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.AMMO_DEPOT;
+        entity.detail = "DEPOT MUNITIONS";
+        return true;
     }
 }

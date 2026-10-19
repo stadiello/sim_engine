@@ -7,6 +7,8 @@ import javax.imageio.ImageIO;
 import object.ai.AiTuning;
 import object.ai.TacticalMovement;
 import object.weapon.Weapon;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Soldat extends Homme {
 
@@ -54,7 +56,6 @@ public class Soldat extends Homme {
     private int suppressiveFireTimer = 0;
     private int suppressiveRearminTimer = 0;
     private int armorPlates = 0;
-
 
     static {
         try {
@@ -581,5 +582,12 @@ public class Soldat extends Homme {
     public void applyNetworkPose(double networkFacingX, double networkFacingY) {
         facingX = networkFacingX;
         facingY = networkFacingY;
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.SOLDIER;
+        entity.detail = getCarriedWeapon().getName();
+        return true;
     }
 }

@@ -3,6 +3,8 @@ package object;
 import java.awt.*;
 import java.io.IOException;
 import javax.imageio.ImageIO;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class Alien extends Homme {
 
@@ -109,5 +111,10 @@ public class Alien extends Homme {
         g2d.drawImage(imgAlien, (int)x - 16, (int)y - 16, 32, 32, null);
         g2d.setTransform(old); // Restauration de la transformation originale pour ne pas affecter les autres dessins
     }
-    
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.ALIEN;
+        return true;
+    }
 }

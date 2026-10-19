@@ -801,7 +801,7 @@ public class BotBrain {
     }
 
     private boolean isArcadeMode() {
-        return GameMode.current == GameMode.ARCADE;
+        return ObjectManager.getSession().isMode(GameMode.ARCADE);
     }
 
     private int getEnemyReactionFrames() {

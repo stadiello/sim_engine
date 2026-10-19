@@ -4,6 +4,8 @@ import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class AlienTeleport extends GameObject {
 
@@ -58,5 +60,12 @@ public class AlienTeleport extends GameObject {
         g2d.drawOval((int) Math.round(x - outer), (int) Math.round(y - outer), outer * 2, outer * 2);
 
         g2d.setStroke(oldStroke);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.EFFECT;
+        entity.variant = 5;
+        return true;
     }
 }

@@ -4,6 +4,8 @@ import java.awt.*;
 import java.awt.geom.AffineTransform;
 
 import object.weapon.Weapon;
+import network.NetworkReplica;
+import network.WorldSnapshot;
 
 public class DroppedWeapon extends GameObject {
 
@@ -65,5 +67,13 @@ public class DroppedWeapon extends GameObject {
         FontMetrics fm = g2d.getFontMetrics();
         String label = weapon.getName();
         g2d.drawString(label, (int) x - fm.stringWidth(label) / 2, (int) y + 22);
+    }
+
+    @Override
+    public boolean describeForNetwork(WorldSnapshot.Entity entity, Protagonist viewer) {
+        entity.type = NetworkReplica.PICKUP;
+        entity.variant = 2;
+        entity.detail = getWeapon().getName();
+        return true;
     }
 }
